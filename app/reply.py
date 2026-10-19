@@ -90,20 +90,41 @@ def _template_reply(creator: Creator, ext: Extraction, a: Assessment) -> str:
     )
 
 
+def _ai_context(creator: Creator, ext: Extraction, a: Assessment) -> dict:
+    return {
+        "creator_name": creator.name,
+        "brand": ext.brand,
+        "recommended_action": a.recommended_action,
+        "reason": a.reason,
+        "quote_total": _fmt_inr(a.quote.total) if a.quote else None,
+        "offered": _fmt_inr(a.offer_value) if a.offer_value else None,
+        "counter_offer_amount": _fmt_inr(a.counter_offer_amount) if a.counter_offer_amount else None,
+        "missing_fields": a.missing_fields,
+        "deliverables": _deliverables_str(ext),
+        "flags": a.flags,
+    }
+
+
+def ai_reply(creator: Creator, ext: Extraction, a: Assessment, *, cached_only: bool = False) -> str | None:
+    if a.recommended_action == "mark_spam":
+        return None
+    return ai.write_reply_ai(_ai_context(creator, ext, a), cached_only=cached_only)
+
+
+def draft_for_page(creator: Creator, ext: Extraction, a: Assessment, ai_on: bool) -> tuple[str, str]:
+    """(text, source) without ever waiting on a model: an AI draft for these exact terms
+    if one was already written, otherwise the template. Rendering this on every edit is
+    what keeps re-scoring instant."""
+    if ai_on:
+        text = ai_reply(creator, ext, a, cached_only=True)
+        if text:
+            return text, "ai"
+    return _template_reply(creator, ext, a), "template"
+
+
 def generate_reply(creator: Creator, ext: Extraction, a: Assessment, ai_on: bool) -> str:
     if ai_on:
-        context = {
-            "creator_name": creator.name,
-            "brand": ext.brand,
-            "recommended_action": a.recommended_action,
-            "reason": a.reason,
-            "quote_total": a.quote.total if a.quote else None,
-            "counter_offer_amount": a.counter_offer_amount,
-            "missing_fields": a.missing_fields,
-            "deliverables": [{"type": d.type, "count": d.count} for d in ext.deliverables],
-            "flags": a.flags,
-        }
-        ai_reply = ai.write_reply_ai(context)
-        if ai_reply:
-            return ai_reply
+        text = ai_reply(creator, ext, a)
+        if text:
+            return text
     return _template_reply(creator, ext, a)

@@ -6,13 +6,13 @@
   <div>
     <h1>Triage queue</h1>
     <p class="page-head__meta">
-      {% if has_data %}{{ total }} inquir{{ 'y' if total == 1 else 'ies' }} · {{ creator_count }} creator{{ 's' if creator_count != 1 }}{% if last_scan %} · last scan {{ last_scan|datetime_long }}{% endif %}
+      {% if has_data %}{{ total }} inquir{{ 'y' if total == 1 else 'ies' }} · {{ creator_count }} creator{{ 's' if creator_count != 1 }}{% if last_scan %} · last scan {{ last_scan|datetime_long }}{% if last_scan_note %} ({{ last_scan_note }}){% endif %}{% endif %}
       {% else %}Not scanned yet · {{ creators|length }} creator inboxes connected{% endif %}
     </p>
   </div>
   {% if has_data %}
   <div class="page-head__actions">
-    <form method="post" action="/scan"><button class="btn btn--primary" type="submit">{{ ui.icon('scan') }} Scan inboxes</button></form>
+    <form method="post" action="/scan" data-busy="{{ 'Scanning — AI fills gaps for up to 40 s…' if ai_on else 'Scanning…' }}"><button class="btn btn--primary" type="submit">{{ ui.icon('scan') }} Scan inboxes</button></form>
   </div>
   {% endif %}
 </div>

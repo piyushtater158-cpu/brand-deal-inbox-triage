@@ -152,6 +152,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: #3A4152; color: #E6E8EE; border-color: #8C93A3; border-style: dashed;
 }
 .ai-toggle--off .ai-toggle__light { background: transparent; }
+.ai-toggle { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.ai-toggle__note { max-width: 260px; font-size: var(--fs-xs); color: #F4D58D; text-align: right; }
+.reply__ai { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; margin: var(--s1) 0 var(--s2); }
+.reply__ai .help { margin: 0; }
 
 .page { max-width: var(--page-max); margin: 0 auto; padding: var(--s5) var(--gutter) var(--s7); }
 .page-head {

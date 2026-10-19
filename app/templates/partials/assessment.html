@@ -96,8 +96,15 @@
     <div class="reply">
       <div class="reply__bar">
         <label class="assessment__h" for="{{ reply_id }}">Reply draft</label>
-        <span class="reply__status">{{ 'Written by AI — check it' if ai_on else 'Template draft' }} · not sent</span>
+        <span class="reply__status">{{ 'Written by AI — check it' if reply_source == 'ai' else 'Template draft' }} · not sent</span>
       </div>
+      {% if ai_on and reply_source != 'ai' and a.recommended_action != 'mark_spam' %}
+      <form class="reply__ai" method="post" action="/inquiry/{{ inquiry['id'] }}/ai-reply" hx-post="/inquiry/{{ inquiry['id'] }}/ai-reply" hx-target="#assessment" hx-swap="outerHTML" hx-disabled-elt="find button" data-busy="Writing with a free AI model…">
+        <button class="btn btn--small" type="submit"{{ ' disabled' if not ai_status.available }}>Write with AI</button>
+        <span class="help">{{ ai_status.note if not ai_status.available else 'Same facts and numbers, warmer wording. Takes 5–30 seconds on free models.' }}</span>
+      </form>
+      {% endif %}
+      {% if ai_reply_error %}<p class="alert" role="alert">{{ ui.icon('x') }}<span>{{ ai_reply_error }}</span></p>{% endif %}
 <textarea class="textarea reply__text" id="{{ reply_id }}" name="reply_text" form="{{ form_id }}" rows="14">{{ reply_draft }}</textarea>
       <div class="reply__bar">
         <button class="btn" type="button" data-copy="#{{ reply_id }}">{{ ui.icon('copy') }} Copy reply</button>

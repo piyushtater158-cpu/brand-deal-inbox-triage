@@ -26,7 +26,56 @@ def no_api_key(monkeypatch):
 
 
 def test_extract_with_ai_returns_none_without_key():
-    assert ai.extract_with_ai("some text", "subject", REF) is None
+    assert ai.extract_with_ai("some text", "subject", REF, ["skincare"]) is None
+
+
+def test_only_free_models_are_ever_requested(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_MODEL", "openai/gpt-5, minimax/minimax-m3.1-flash:free, openrouter/auto")
+    assert ai._models("text") == ["minimax/minimax-m3.1-flash:free"]
+
+
+def test_ai_fills_only_gaps_and_only_with_known_categories():
+    """Rules values always win; an AI category outside the config vocabulary is dropped,
+    because conflict and no-go checks are exact matches."""
+    from app.extract import category_vocabulary, fill_gaps
+
+    rules = extract_fields(
+        "hi, ek reel aur do stories chahiye. budget 40k hai.", "", "instagram.com", REF,
+    )
+    assert rules.brand is None and rules.go_live_date is None
+    ai_fields = ai._clean_extraction({
+        "brand": "Plum Goodness", "brand_category": "Ayurveda",
+        "budget_amount": 99999, "go_live_date": "2026-11-08",
+        "deliverables": [{"type": "reels", "count": 4}],
+    }, category_vocabulary())
+    assert "brand_category" not in ai_fields and "deliverables" not in ai_fields
+
+    ext = fill_gaps(rules, ai_fields)
+    assert ext.budget_amount == 40000 and ext.provenance["budget_amount"] == "rules"
+    assert ext.brand == "Plum Goodness" and ext.provenance["brand"] == "ai"
+    assert ext.go_live_date == dt.date(2026, 11, 8) and ext.provenance["go_live_date"] == "ai"
+    assert ext.brand_category is None
+
+
+def test_ai_brand_resolves_category_through_the_lookup_first():
+    from app.extract import category_vocabulary, fill_gaps
+
+    rules = extract_fields("2 reels, budget ₹1,50,000", "", "x.in", REF)
+    ext = fill_gaps(rules, ai._clean_extraction(
+        {"brand": "Nivara Soaps", "brand_category": "skincare"}, category_vocabulary()))
+    assert ext.brand_category == "personal care"
+
+
+def test_page_render_never_waits_on_a_model(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(ai.httpx, "post", lambda *a, **k: pytest.fail("page render called the API"))
+    from app.reply import draft_for_page
+
+    aanya = CREATORS["aanya_mehra"]
+    ext = Extraction(brand="TestBrand", budget_amount=150000, deliverables=[Deliverable("reel", 1)])
+    a = assess(aanya, ext, REF, raw_text="", sender_domain="test.com")
+    text, source = draft_for_page(aanya, ext, a, ai_on=True)
+    assert source == "template" and text
 
 
 def test_infer_brand_category_ai_returns_none_without_key():

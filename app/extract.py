@@ -208,6 +208,55 @@ def _detect_brand(text: str, subject: str) -> tuple[str | None, str | None]:
     return None, None
 
 
+def category_vocabulary() -> list[str]:
+    """Every category the engine can act on. Conflict and no-go checks are exact string
+    matches, so an AI-supplied category outside this list would silently miss them."""
+    cfg = load_config()
+    cats = set(cfg["brand_category_lookup"].values()) | set(cfg["global_no_go_categories"])
+    for k, v in cfg["category_adjacency"].items():
+        cats.add(k)
+        cats.update(v)
+    return sorted(cats)
+
+
+def needs_ai(ext: Extraction) -> bool:
+    """AI is only asked about a message when the rules left a field the score depends on."""
+    return (
+        not ext.brand or not ext.brand_category or not ext.deliverables
+        or (ext.budget_amount is None and ext.product_value is None)
+        or ext.go_live_date is None or ext.usage_rights_days is None
+    )
+
+
+def fill_gaps(ext: Extraction, ai_fields: dict) -> Extraction:
+    """Rules first: AI values land only where the rules found nothing, marked 'ai'."""
+    for name, value in ai_fields.items():
+        if name == "brand_category":
+            continue
+        current = getattr(ext, name)
+        if current is None or current == []:
+            if name == "deliverables":
+                value = [Deliverable(type=d["type"], count=d["count"]) for d in value]
+            setattr(ext, name, value)
+            ext.provenance[name] = "ai"
+    if not ext.brand_category:
+        lookup = load_config()["brand_category_lookup"]
+        if ext.brand and ext.brand.lower() in lookup:
+            ext.brand_category = lookup[ext.brand.lower()]
+            ext.provenance["brand_category"] = ext.provenance.get("brand", "rules")
+        elif ai_fields.get("brand_category"):
+            ext.brand_category = ai_fields["brand_category"]
+            ext.provenance["brand_category"] = "ai"
+    if ext.budget_type in ("not_stated", "negotiable"):
+        if ext.budget_amount is not None:
+            ext.budget_type = "fixed"
+            ext.provenance["budget_type"] = ext.provenance["budget_amount"]
+        elif ext.product_value is not None:
+            ext.budget_type = "barter"
+            ext.provenance["budget_type"] = ext.provenance["product_value"]
+    return ext
+
+
 def extract_fields(raw_text: str, subject: str, sender_domain: str, reference_date: dt.date) -> Extraction:
     brand, brand_category = _detect_brand(raw_text, subject)
 

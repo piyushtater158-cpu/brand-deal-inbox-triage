@@ -105,6 +105,10 @@ CREATE TABLE IF NOT EXISTS skipped_mail (
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY, value TEXT
 );
+
+CREATE TABLE IF NOT EXISTS ai_cache (
+    key TEXT PRIMARY KEY, value TEXT, created_at TEXT
+);
 """
 
 
@@ -409,6 +413,28 @@ def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
 
 def ai_enabled(conn: sqlite3.Connection) -> bool:
     return get_setting(conn, "ai_enabled", "false") == "true"
+
+
+def ai_cache_get(key: str) -> str | None:
+    """Own short-lived connection: AI calls run in worker threads, outside any request
+    transaction. A missing table (schema not initialised yet) is just a cache miss."""
+    try:
+        with get_conn() as conn:
+            row = conn.execute("SELECT value FROM ai_cache WHERE key = ?", (key,)).fetchone()
+    except sqlite3.OperationalError:
+        return None
+    return row["value"] if row else None
+
+
+def ai_cache_put(key: str, value: str) -> None:
+    try:
+        with get_conn() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO ai_cache (key, value, created_at) VALUES (?, ?, ?)",
+                (key, value, dt.datetime.now().isoformat(timespec="seconds")),
+            )
+    except sqlite3.OperationalError:
+        pass
 
 
 # ---------------------------------------------------------------------------------

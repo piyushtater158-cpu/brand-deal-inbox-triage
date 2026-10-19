@@ -17,8 +17,8 @@ and ranks them, flags the risks, and drafts a reply the manager approves and cop
 **Nothing is ever sent automatically.**
 
 Every flag and score traces to a rule in `config.yaml`. AI is an optional layer on top
-for five tasks (extraction, brand-category inference, ambiguous-spam judgment, reply
-writing, screenshot OCR) — never the source of truth. The AI toggle in the header
+— filling extraction gaps the rules left, writing reply language on request, and
+reading DM screenshots — never the source of truth. The AI toggle in the header
 switches everything to deterministic fallbacks, and the app stays fully usable either
 way.
 
@@ -59,16 +59,18 @@ python -m venv .venv
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/piyushtater158-cpu/brand-deal-inbox-triage)
 
 `render.yaml` describes one free Docker web service in Singapore. The container binds
-to the `PORT` Render injects. The `OPENROUTER_*` variables are prompted for at deploy
-time; leave them empty and the app runs fully on the rules path, with AI off.
+to the `PORT` Render injects. Only `OPENROUTER_API_KEY` is needed for AI (the free
+model lists live in `config.yaml`); leave it empty and the app runs fully on the rules
+path, with AI off.
 
 Two free-tier caveats, both expected by design:
 
 - **Spin-down.** The service sleeps after about 15 minutes idle, and the first request
   after that takes up to a minute while it wakes.
-- **Ephemeral disk.** Every wake or redeploy starts with an empty database. Creators
-  reload from `seed/` on the first request; click **Scan inboxes** to rebuild the
-  queue. The decision log resets too (see "Why the database is rebuildable" below).
+- **Ephemeral disk.** Every wake or redeploy starts with an empty database. On boot the
+  app reloads creators from `seed/` and runs a rules-only scan, so the queue is always
+  populated when someone opens it. The decision log, `/config` edits and the AI cache
+  reset too (see "Why the database is rebuildable" below).
 
 ## Where the config is
 
@@ -87,8 +89,9 @@ drop this key (the engine falls back to `date.today()` when it's unset).
 ## Verifying it
 
 ```bash
-pytest                           # 67 tests: quote math, extraction regex, AI-off
-                                  # fallbacks, manager edits + live re-score, DM
+pytest                           # 71 tests: quote math, extraction regex, AI-off
+                                  # fallbacks, free-models-only + AI gap-filling rules,
+                                  # manager edits + live re-score, DM
                                   # preview, config/creator saves, and the full
                                   # scenario fixture
 python scripts/check_expected.py # standalone AI-off acceptance check, no pytest
@@ -179,17 +182,32 @@ demo; a real deployment would move `decisions` to a durable store first.
 
 ## AI
 
-One function (`app/ai.py`), behind `OPENROUTER_MODEL` / `OPENROUTER_API_KEY` /
-`OPENROUTER_VISION_MODEL` env vars, pydantic-validated with one retry. Five tasks, each
-with a real deterministic fallback:
+One module (`app/ai.py`) behind `OPENROUTER_API_KEY`. **Only free OpenRouter models are
+ever called**: the model lists are in `config.yaml` (`ai.text_models`,
+`ai.vision_models`; `OPENROUTER_MODEL` / `OPENROUTER_VISION_MODEL` can override them,
+comma-separated), and any model without a `:free` suffix is dropped before a request
+is built. Models are tried in chunks of three (OpenRouter's fallback-list limit); a
+chunk that errors or returns unusable output moves on to the next.
 
 | Task | AI on | AI off |
 |---|---|---|
-| Field extraction | Structured parse of messy/Hinglish text | Regex: ₹/k/L/lakh, Hinglish numerals, dates, deliverable keywords |
-| Brand category | Inferred from brand name/description | `brand_category_lookup` in config + "unknown" |
-| Ambiguous spam | Judgment call | Hard patterns only (pay-to-join, crypto/forex, shortened links, lookalike domains, free-mail + big-brand-name) |
-| Reply writing | Warm professional tone | Template per recommended action |
-| Screenshot OCR | Vision model transcribes the DM | Disabled — text paste only, per the brief |
+| Field extraction | Rules first; AI fills only the fields the rules left empty, and only with values that pass validation | Regex: ₹/k/L/lakh, Hinglish numerals, dates, deliverable keywords |
+| Brand category | Chosen from the config's category vocabulary (conflict and no-go checks are exact matches), after the brand lookup | `brand_category_lookup` in config + "unknown" |
+| Reply writing | **Write with AI** button on the inquiry: warmer wording, same facts and ₹ amounts | Template per recommended action |
+| Screenshot OCR | Free vision model transcribes the DM, then the same extraction runs | Disabled — text paste only, per the brief |
+
+Free models are slow (3–30 s), flaky, and capped (about 50 requests a day on an
+account without purchased credits), so the AI layer is built to never make the app
+feel broken:
+
+- **Nothing waits on a model unless you asked for it.** Page loads and field edits
+  only read cached AI replies, so re-scoring stays instant. A scan calls AI only for
+  messages with gaps (4 of the 30 seed messages), in parallel, inside a 40 s budget;
+  whatever isn't back by then keeps its rules extraction.
+- **Every successful answer is cached** in SQLite by task + prompt, so a rescan, a DM
+  preview → Add to queue, or a revisit doesn't spend quota again.
+- **Rate limits pause AI instead of stalling it.** A per-minute limit pauses AI for a
+  minute, the daily limit until 00:00 UTC; the header says so, and rules cover.
 
 If `OPENROUTER_API_KEY` isn't set, every AI call returns `None` immediately and the
 caller falls through to the rules path — "AI on, unconfigured" behaves identically to

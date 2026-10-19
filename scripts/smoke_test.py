@@ -287,8 +287,11 @@ def run() -> None:
     check("AI toggle on shows in chrome", "ai-toggle--on" in c.get("/").text)
     check("DM page offers screenshot upload when AI on", 'type="file"' in c.get("/dm").text)
     c.post("/scan")
-    bad = golden_mismatches(c)
-    check("AI on without a key falls back to rules (results unchanged)", not bad, "; ".join(bad[:5]))
+    ai_touched = {r["inquiry_id"] for r in debug(c)["inquiries"] if r.get("ai_fields")}
+    bad = [b for b in golden_mismatches(c) if b.split()[0] not in ai_touched]
+    check("AI on: every inquiry AI didn't fill matches the rules results", not bad,
+          "; ".join(bad[:5]) or (f"AI filled gaps in {len(ai_touched)}: {sorted(ai_touched)}"
+                                 if ai_touched else "no key or no gaps: identical to AI off"))
     set_ai(c, False)
     check("AI toggle off shows in chrome", "ai-toggle--off" in c.get("/").text)
 

@@ -26,4 +26,17 @@
     var trigger = evt.target.closest("[data-copy]");
     if (trigger) copyFrom(trigger.getAttribute("data-copy"));
   });
+
+  // Forms that can wait on a free AI model say so instead of looking frozen.
+  function markBusy(form) {
+    var msg = form.getAttribute("data-busy");
+    var btn = form.querySelector("button[type=submit], button:not([type])");
+    if (!msg || !btn || btn.dataset.busy) return;
+    btn.dataset.busy = "1";
+    btn.setAttribute("aria-busy", "true");
+    btn.textContent = msg;
+  }
+  document.addEventListener("submit", function (evt) {
+    if (evt.target.matches("form[data-busy]")) markBusy(evt.target);
+  });
 })();

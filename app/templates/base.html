@@ -22,6 +22,7 @@
     <form class="ai-toggle ai-toggle--{{ 'on' if ai_on else 'off' }}" method="post" action="/settings/ai-toggle">
       <input type="hidden" name="enabled" value="{{ 'false' if ai_on else 'true' }}">
       <button class="ai-toggle__btn" type="submit" aria-pressed="{{ 'true' if ai_on else 'false' }}"><span class="ai-toggle__light" aria-hidden="true"></span>{{ 'AI ON' if ai_on else 'AI OFF' }} <span class="ai-toggle__hint">click to turn {{ 'off' if ai_on else 'on' }}</span></button>
+      {% if ai_on and ai_status and not ai_status.available %}<span class="ai-toggle__note" role="status">{{ ai_status.note }}</span>{% endif %}
     </form>
   </div>
 </header>

@@ -16,7 +16,7 @@ from fastapi.templating import Jinja2Templates
 
 from app import ai, db, fmt, pipeline, view
 from app.config_loader import load_config, reference_date, save_config
-from app.reply import generate_reply
+from app.reply import ai_reply, draft_for_page
 from app.score import assess
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -41,11 +41,15 @@ templates.env.globals.update(
 
 
 def _ensure_db() -> None:
+    """A fresh database (first boot, or a free host waking on an empty disk) is seeded
+    and scanned, so the queue is never empty when someone opens the app."""
     with db.get_conn() as conn:
         db.init_schema(conn)
         if not db.creators_loaded(conn):
             for c in db.load_creators_from_csv():
                 db.save_creator(conn, c)
+        if not db.get_setting(conn, "last_scan"):
+            pipeline.run_scan(conn)
 
 
 @app.on_event("startup")
@@ -54,6 +58,7 @@ def on_startup():
 
 
 def _render(request: Request, name: str, ctx: dict, conn=None) -> HTMLResponse:
+    ctx.setdefault("ai_status", ai.status())
     if "ai_on" not in ctx:
         if conn is None:
             with db.get_conn() as c:
@@ -121,6 +126,7 @@ def _queue_context(conn, creator: str, type_: str, flag: str, priority: str) -> 
         "rows": filtered, "creators": creators, "has_data": bool(rows), "total": len(rows),
         "creator_count": len({r["inquiry"]["creator_id"] for r in rows}),
         "skipped_count": len(db.list_skipped(conn)), "last_scan": db.get_setting(conn, "last_scan"),
+        "last_scan_note": db.get_setting(conn, "last_scan_note"),
         "filters": {"creator": creator, "type": type_, "flag": flag, "priority": priority},
         "active_filters": active, "filter_creator": by_id.get(creator),
         "filter_creator_count": sum(r["inquiry"]["creator_id"] == creator for r in rows),
@@ -163,7 +169,8 @@ def skipped_page(request: Request):
 # -------------------------------------------------------------------------------
 
 def _inquiry_context(conn, inquiry_id: str, *, prev_assessment=None, prev_uncapped=None,
-                     edited_field: str | None = None, edit_error: str | None = None) -> dict:
+                     edited_field: str | None = None, edit_error: str | None = None,
+                     ai_reply_error: str | None = None) -> dict:
     inquiry = db.get_inquiry(conn, inquiry_id)
     if inquiry is None:
         raise HTTPException(status_code=404, detail="Inquiry not found")
@@ -202,6 +209,7 @@ def _inquiry_context(conn, inquiry_id: str, *, prev_assessment=None, prev_uncapp
         "prev_id": order[pos - 1] if pos else None,
         "next_id": order[pos + 1] if pos is not None and pos + 1 < len(order) else None,
     }
+    reply_draft, reply_source = draft_for_page(creator, ext, a, ai_on)
 
     return {
         "inquiry": inquiry, "creator": creator, "extraction": ext, "assessment": a,
@@ -209,9 +217,10 @@ def _inquiry_context(conn, inquiry_id: str, *, prev_assessment=None, prev_uncapp
         "quote_rows": view.quote_rows(creator, ext, a), "uncapped": uncapped,
         "prev_uncapped": prev_uncapped, "cleared": cleared, "cleared_why": cleared_why,
         "rec": view.recommendation(creator, a), "stamp": stamp, "edit_error": edit_error,
-        "reply_draft": generate_reply(creator, ext, a, ai_on),
+        "reply_draft": reply_draft, "reply_source": reply_source,
         "decision": view.decision_view(db.get_decision_for_inquiry(conn, inquiry_id), creator),
         "nav": nav, "ai_on": ai_on, "active": "queue",
+        "ai_reply_error": ai_reply_error,
     }
 
 
@@ -266,6 +275,31 @@ def reextract(request: Request, inquiry_id: str):
         ctx["stamp"] = "Re-extracted with rules only · your edits were discarded"
         ctx["refresh_fields"] = True
         return _render(request, "partials/edit_response.html", ctx, conn)
+
+
+@app.post("/inquiry/{inquiry_id}/ai-reply", response_class=HTMLResponse)
+def write_ai_reply(request: Request, inquiry_id: str):
+    """The one place a reply waits on a model — on request, never on page load or edit.
+    The answer is cached for these exact terms, so the re-render below picks it up."""
+    with db.get_conn() as conn:
+        inquiry = db.get_inquiry(conn, inquiry_id)
+        if inquiry is None:
+            raise HTTPException(status_code=404, detail="Inquiry not found")
+        creator, ext = db.get_creator(conn, inquiry["creator_id"]), db.get_extraction(conn, inquiry_id)
+        a = db.get_assessment(conn, inquiry_id)
+        if ext is None or a is None:
+            raise HTTPException(status_code=404, detail="Inquiry not scored yet")
+        ai_on = db.ai_enabled(conn)
+    error = None
+    if not ai_on:
+        error = "AI is off — turn it on in the header to write the reply with AI."
+    elif ai_reply(creator, ext, a) is None:
+        error = ai.status()["note"] or "The free AI models didn't answer in time. The template draft is kept — try again in a minute."
+    if not _is_htmx(request):
+        return RedirectResponse(f"/inquiry/{inquiry_id}", status_code=303)
+    with db.get_conn() as conn:
+        ctx = _inquiry_context(conn, inquiry_id, ai_reply_error=error)
+        return _render(request, "partials/assessment.html", ctx, conn)
 
 
 @app.post("/inquiry/{inquiry_id}/decision", response_class=HTMLResponse)
@@ -458,11 +492,16 @@ async def dm_process(request: Request, creator_id: str = Form(...), dm_text: str
         text, from_screenshot = dm_text.strip(), False
         if not text and screenshot is not None and screenshot.filename and ai_on:
             content = await screenshot.read()
-            text = (ai.ocr_screenshot_ai(base64.b64encode(content).decode()) or "").strip()
+            if len(content) > 5 * 1024 * 1024:
+                return _render(request, "dm_intake.html", _dm_context(
+                    conn, form=form, error="That screenshot is over 5 MB — crop it or paste the text instead."), conn)
+            mime = screenshot.content_type if screenshot.content_type in ("image/png", "image/jpeg", "image/webp") else "image/png"
+            text = (ai.ocr_screenshot_ai(base64.b64encode(content).decode(), mime) or "").strip()
             from_screenshot = True
             if not text:
+                reason = ai.status()["note"] or "The free vision models couldn't read it in time."
                 return _render(request, "dm_intake.html", _dm_context(
-                    conn, form=form, error="Couldn't read that screenshot — AI isn't configured or the image was unclear. Paste the text instead."), conn)
+                    conn, form=form, error=f"Couldn't read that screenshot. {reason} Paste the text instead."), conn)
         if not text:
             return _render(request, "dm_intake.html", _dm_context(
                 conn, form=form, error="Paste the DM text first."), conn)
@@ -692,5 +731,6 @@ def api_debug():
             "rate_fit_pct": a.rate_fit_pct,
             "counter_offer_amount": a.counter_offer_amount,
             "quote_total": a.quote.total if a.quote else None,
+            "ai_fields": sorted(f for f, p in (r["extraction"].provenance if r["extraction"] else {}).items() if p == "ai"),
         })
     return {"inquiries": out, "skipped_count": len(skipped)}

@@ -8,20 +8,66 @@ import datetime as dt
 import re
 import sqlite3
 import uuid
+from concurrent.futures import ThreadPoolExecutor, wait
 
 from app import ai, db, extract
+from app.config_loader import load_config
 from app.config_loader import reference_date as get_reference_date
 from app.dedupe import merge_duplicates, thread_key
 from app.scanner import SampleFolderScanner, filter_by_keywords
 from app.score import assess
 
 
+def _ai_fill(ext, raw_text: str, subject: str, ref_date) -> bool:
+    filled = ai.extract_with_ai(raw_text, subject, ref_date, extract.category_vocabulary())
+    if filled:
+        extract.fill_gaps(ext, filled)
+    return bool(filled)
+
+
 def _extract_for_message(raw_text: str, subject: str, sender_domain: str, ref_date, ai_on: bool):
-    if ai_on:
-        ai_ext = ai.extract_with_ai(raw_text, subject, ref_date)
-        if ai_ext is not None:
-            return ai_ext
-    return extract.extract_fields(raw_text, subject, sender_domain, ref_date)
+    ext = extract.extract_fields(raw_text, subject, sender_domain, ref_date)
+    if ai_on and extract.needs_ai(ext):
+        _ai_fill(ext, raw_text, subject, ref_date)
+    return ext
+
+
+def _extract_all(messages, ref_date, ai_on: bool) -> tuple[list, dict]:
+    """Rules for every message; AI in parallel for the ones with gaps, inside a time
+    budget. Anything AI hasn't answered by the deadline keeps its rules extraction
+    (its answer still lands in the cache for the next scan)."""
+    exts = [extract.extract_fields(m.raw_text, m.subject, m.sender_domain, ref_date) for m in messages]
+    stats = {"ai_on": ai_on, "needed": 0, "filled": 0}
+    if not ai_on:
+        return exts, stats
+    todo = [i for i, e in enumerate(exts) if extract.needs_ai(e)]
+    stats["needed"] = len(todo)
+    if not todo:
+        return exts, stats
+    cfg = load_config()["ai"]
+    pool = ThreadPoolExecutor(max_workers=int(cfg.get("scan_workers", 4)))
+    futures = {
+        pool.submit(ai.extract_with_ai, messages[i].raw_text, messages[i].subject, ref_date,
+                    extract.category_vocabulary()): i
+        for i in todo
+    }
+    done, _ = wait(futures, timeout=float(cfg.get("scan_time_budget_seconds", 40)))
+    pool.shutdown(wait=False, cancel_futures=True)
+    for f in done:
+        filled = f.result() if not f.exception() else None
+        if filled:
+            extract.fill_gaps(exts[futures[f]], filled)
+            stats["filled"] += 1
+    return exts, stats
+
+
+def scan_note(stats: dict) -> str:
+    if not stats.get("ai_on"):
+        return "rules only (AI off)"
+    if not stats["needed"]:
+        return "AI on · rules found every scored field, no AI calls needed"
+    return (f"AI on · {stats['needed']} message{'s' if stats['needed'] != 1 else ''} had gaps the rules "
+            f"couldn't fill · AI filled {stats['filled']}")
 
 
 def run_scan(conn: sqlite3.Connection) -> dict:
@@ -31,17 +77,12 @@ def run_scan(conn: sqlite3.Connection) -> dict:
     all_messages = scanner.fetch_all_creators(creators)
     matching, skipped = filter_by_keywords(all_messages)
 
-    db.reset_ingest_tables(conn)
-
     ref_date = get_reference_date()
     ai_on = db.ai_enabled(conn)
+    exts, stats = _extract_all(matching, ref_date, ai_on)
 
-    pairs = []
-    for msg in matching:
-        ext = _extract_for_message(msg.raw_text, msg.subject, msg.sender_domain, ref_date, ai_on)
-        pairs.append((msg, ext))
-
-    merged = merge_duplicates(pairs)
+    db.reset_ingest_tables(conn)
+    merged = merge_duplicates(list(zip(matching, exts)))
 
     for group in merged:
         rep_msg = group.messages[0]
@@ -76,7 +117,8 @@ def run_scan(conn: sqlite3.Connection) -> dict:
         db.save_skipped(conn, msg.creator_id, msg.source, msg.received_at, msg.subject, reason)
 
     db.set_setting(conn, "last_scan", dt.datetime.now().isoformat(timespec="minutes"))
-    return {"matched": len(matching), "skipped": len(skipped), "inquiries": len(merged)}
+    db.set_setting(conn, "last_scan_note", scan_note(stats))
+    return {"matched": len(matching), "skipped": len(skipped), "inquiries": len(merged), **stats}
 
 
 _AMOUNT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(k|l|lakh|lakhs|lac)?", re.IGNORECASE)
