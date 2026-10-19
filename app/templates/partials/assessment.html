@@ -1,85 +1,116 @@
-<div id="assessment" class="assessment">
+{% import "partials/ui.html" as ui %}
+{% set a = assessment %}
+<section id="assessment" class="assessment" aria-labelledby="assessment-h">
+  <h2 class="visually-hidden" id="assessment-h">Assessment</h2>
+
   {% if edit_error %}
-    <p class="edit-error" role="alert">{{ edit_error }}</p>
-  {% endif %}
-  <div class="assessment-headline">
-    <span class="score">{{ assessment.final_score|round(0, 'floor')|int }}</span>
-    <span class="priority-badge priority-{{ assessment.priority|lower }}">{{ assessment.priority }}</span>
-    <span class="type-badge type-{{ assessment.type }}">{{ assessment.type|replace('_', ' ')|title }}</span>
-  </div>
-
-  {% if assessment.flags %}
-  <div class="flag-list">
-    {% for f in assessment.flags %}
-      <span class="flag-chip flag-{{ f }}">{{ f|replace('_', ' ')|title }}</span>
-    {% endfor %}
+  <div class="assessment__section">
+    <p class="alert" role="alert">{{ ui.icon('x') }}<span>{{ edit_error }} <span class="alert__ink">Nothing was changed.</span></span></p>
   </div>
   {% endif %}
 
-  <p class="reason">{{ assessment.reason }}</p>
+  <div class="assessment__head">
+    {{ ui.score(a, lg=true) }}
+    <div class="assessment__verdict">
+      <div class="assessment__line">
+        {{ ui.pri(a.priority) }}
+        {{ ui.type_badge(a.type) }}
+        {% if stamp %}<span class="assessment__stamp">{{ stamp }}</span>{% endif %}
+      </div>
+      <p><span class="assessment__rec-label">Recommended action</span><br><span class="assessment__rec">{{ rec.headline }}</span></p>
+    </div>
+  </div>
 
-  {% if 'conflict' in assessment.flags %}
-    <p class="cap-note">Score capped at 20 — a conflict overrides everything else below.</p>
+  <div class="assessment__section">
+    {% if 'no_go' in a.flags %}
+    <p class="cap-note">{{ ui.icon('stop', lg=true) }}<span><b>Score set to 0 by No-go.</b> <span class="cap-note__ink">{{ extraction.brand_category|capitalize }} is a category {{ creator.name.split()[0] }} doesn't work with. Nothing about the offer can change that.</span></span></p>
+    {% elif uncapped %}
+    <p class="cap-note">{{ ui.icon('stop', lg=true) }}<span><b>Score capped at 20 by Conflict.</b> <span class="cap-note__ink">Uncapped, these terms {{ 'now ' if prev_uncapped is not none }}score {{ uncapped.final_score|int }}{% if prev_uncapped is not none and prev_uncapped != uncapped.final_score|int %} (was {{ prev_uncapped }}){% endif %}{% if uncapped.priority != a.priority %} — that would be {{ uncapped.priority }}{% endif %}. No change to budget or terms can lift the cap — only removing the conflict can.</span></span></p>
+    {% endif %}
+    {% if cleared %}
+    <p class="cleared-note">{{ ui.icon('check') }} Cleared since last score: {% for f in cleared %}<span class="flag flag--cleared">{{ f.label }}</span> {% endfor %}{{ cleared_why }}</p>
+    {% endif %}
+    <h3 class="assessment__h">Flags</h3>
+    {% if flags %}
+    <ul class="flag-list">
+      {% for f in flags %}
+      <li class="flag-row">{{ ui.flag_chip(f) }}<p class="flag-row__why">{{ f.why }}</p></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="flags-none">{{ ui.icon('check') }}No flags — {{ a.reason }}</p>
+    {% endif %}
+  </div>
+
+  {% if a.type not in ('spam', 'not_a_deal') %}
+  <div class="assessment__section">
+    <h3 class="assessment__h">Budget vs quote</h3>
+    {{ ui.bvq(bvq, lg=true, legend="Black tick = " ~ creator.name.split()[0] ~ "'s " ~ (creator.min_acceptable_pct * 100)|round|int ~ "% minimum · right edge = full quote") }}
+
+    {% if quote_rows %}
+    <h3 class="assessment__h">How the quote is built</h3>
+    <div class="quote__wrap">
+      <table class="quote">
+        <thead><tr><th scope="col">Line</th><th scope="col">Why</th><th scope="col" class="quote__amt">Amount</th><th scope="col" class="quote__run">Running</th></tr></thead>
+        <tbody>
+          {% for r in quote_rows %}
+          <tr class="quote__row--{{ r.kind }}"><td class="quote__what">{{ r.what }}</td><td class="quote__why">{{ r.why }}</td><td class="quote__amt">{{ r.amount }}</td><td class="quote__run">{{ r.running }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {% if a.counter_offer_amount %}
+    <div class="counter">
+      <div>
+        <p class="assessment__h">Counter-offer</p>
+        <p class="counter__why">The full quote, rounded to the nearest ₹1,000. It's already in the reply draft below.</p>
+      </div>
+      <p class="counter__amt num">{{ a.counter_offer_amount|inr }}</p>
+    </div>
+    {% endif %}
+  </div>
   {% endif %}
 
-  {% if assessment.quote %}
-  <table class="quote-breakdown">
-    <caption>Quote breakdown</caption>
-    <tr><td>Base ({{ assessment.quote.deliverable_count }} deliverables)</td><td>{{ assessment.quote.base|inr }}</td></tr>
-    {% if assessment.quote.bundle_discount_applied %}
-      <tr><td>Bundle discount (−{{ (assessment.quote.bundle_discount_pct * 100)|round|int }}%)</td>
-          <td>−{{ (assessment.quote.base - assessment.quote.after_discount)|inr }}</td></tr>
-      <tr><td>Subtotal</td><td>{{ assessment.quote.after_discount|inr }}</td></tr>
-    {% endif %}
-    {% if assessment.quote.usage_extra_blocks > 0 %}
-      <tr><td>Usage fee (+{{ (assessment.quote.usage_fee_pct * 100)|round|int }}%, {{ assessment.quote.usage_extra_blocks }} extra 30-day block{{ 's' if assessment.quote.usage_extra_blocks != 1 else '' }})</td>
-          <td>+{{ assessment.quote.usage_fee_amount|inr }}</td></tr>
-    {% endif %}
-    {% if assessment.quote.whitelisting_fee_amount > 0 %}
-      <tr><td>Whitelisting fee (+{{ (assessment.quote.whitelisting_fee_pct * 100)|round|int }}%)</td>
-          <td>+{{ assessment.quote.whitelisting_fee_amount|inr }}</td></tr>
-    {% endif %}
-    {% if assessment.quote.exclusivity_fee_amount > 0 %}
-      <tr><td>Exclusivity fee (+{{ (assessment.quote.exclusivity_fee_pct * 100)|round|int }}%)</td>
-          <td>+{{ assessment.quote.exclusivity_fee_amount|inr }}</td></tr>
-    {% endif %}
-    <tr class="quote-total"><td><strong>Total</strong></td><td><strong>{{ assessment.quote.total|inr }}</strong></td></tr>
-  </table>
-  {% if assessment.rate_fit_pct is not none %}
-    <p class="rate-fit">Rate fit: {{ assessment.rate_fit_pct|round(0, 'floor')|int }}% of quote</p>
-  {% endif %}
-  {% endif %}
+  <div class="assessment__section">
+    <h3 class="assessment__h">Action</h3>
+    {% set form_id = 'decide-' ~ inquiry['id'] %}
+    {% set reply_id = 'reply-' ~ inquiry['id'] %}
+    <form class="actions" id="{{ form_id }}" method="post" action="/inquiry/{{ inquiry['id'] }}/decision" hx-post="/inquiry/{{ inquiry['id'] }}/decision" hx-target="#decision-result" hx-swap="outerHTML">
+      <input type="hidden" name="draft" value="{{ reply_draft }}">
+      {% for key, label, value in [('approve', 'Approve & copy', rec.approve_value), ('edit', 'Edit', none), ('decline', 'Decline', 'decline'), ('ask_for_info', 'Ask for info', 'ask_for_info'), ('mark_spam', 'Mark spam', 'mark_spam')] %}
+      {% set is_rec = rec.button == key %}
+      <div class="action{{ ' action--recommended' if is_rec }}{{ ' action--danger' if key == 'mark_spam' and not is_rec }}">
+        <span class="action__rec"{{ ' aria-hidden="true"'|safe if not is_rec }}>{% if is_rec %}{{ ui.icon('check') }}{% endif %}Recommended</span>
+        {% if key == 'edit' %}
+        <a class="btn" href="#{{ reply_id }}">Edit</a>
+        {% else %}
+        <button class="btn" type="submit" name="action" value="{{ value }}"{% if key == 'approve' %} data-copy="#{{ reply_id }}"{% endif %}{% if is_rec %} aria-describedby="rec-why"{% endif %}>{{ label }}</button>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </form>
+    <p class="help" id="rec-why">{{ rec.why }}</p>
 
-  <p class="recommended-action">
-    Recommended: <strong>{{ assessment.recommended_action|replace('_', ' ')|title }}</strong>
-    {% if assessment.counter_offer_amount %}
-      — counter at {{ assessment.counter_offer_amount|inr }}
-    {% endif %}
-  </p>
+    <div class="reply">
+      <div class="reply__bar">
+        <label class="assessment__h" for="{{ reply_id }}">Reply draft</label>
+        <span class="reply__status">{{ 'Written by AI — check it' if ai_on else 'Template draft' }} · not sent</span>
+      </div>
+<textarea class="textarea reply__text" id="{{ reply_id }}" name="reply_text" form="{{ form_id }}" rows="14">{{ reply_draft }}</textarea>
+      <div class="reply__bar">
+        <button class="btn" type="button" data-copy="#{{ reply_id }}">{{ ui.icon('copy') }} Copy reply</button>
+        <span class="reply__status" data-copy-status>Nothing is sent from Deal Desk. Paste into the creator's mailbox.</span>
+      </div>
+    </div>
 
-  {% if assessment.missing_fields %}
-    <p class="missing-fields">Missing: {{ assessment.missing_fields|join(', ') }}</p>
-  {% endif %}
+    {% include "partials/decision_result.html" %}
+  </div>
 
-  <form hx-post="/inquiry/{{ inquiry['id'] }}/reextract" hx-target="#assessment" hx-swap="outerHTML" class="reextract-form">
-    <button type="submit" class="btn btn-small">Re-extract with AI off</button>
-  </form>
-
-  <form class="action-group" hx-post="/inquiry/{{ inquiry['id'] }}/decision" hx-target="#decision-result" hx-swap="outerHTML">
-    <textarea name="reply_text" class="reply-draft" rows="6">{{ reply_draft }}</textarea>
-    <div class="action-buttons">
-      <button type="submit" name="action" value="accept_and_negotiate"
-        class="btn {{ 'btn-primary' if assessment.recommended_action == 'accept_and_negotiate' else '' }}">Approve &amp; copy</button>
-      <button type="submit" name="action" value="counter_offer"
-        class="btn {{ 'btn-primary' if assessment.recommended_action == 'counter_offer' else '' }}">Counter-offer</button>
-      <button type="submit" name="action" value="ask_for_info"
-        class="btn {{ 'btn-primary' if assessment.recommended_action == 'ask_for_info' else '' }}">Ask for info</button>
-      <button type="submit" name="action" value="decline"
-        class="btn {{ 'btn-primary' if assessment.recommended_action == 'decline' else '' }}">Decline</button>
-      <button type="submit" name="action" value="mark_spam"
-        class="btn {{ 'btn-primary' if assessment.recommended_action == 'mark_spam' else '' }}">Mark spam</button>
+  <form class="reextract-form" method="post" action="/inquiry/{{ inquiry['id'] }}/reextract" hx-post="/inquiry/{{ inquiry['id'] }}/reextract" hx-target="#assessment" hx-swap="outerHTML">
+    <div class="assessment__section">
+      <p class="help">Not sure about the extracted fields? <button class="btn btn--small btn--quiet" type="submit">Re-extract with AI off</button> re-reads the message with rules only and discards your edits.</p>
     </div>
   </form>
-
-  {% include "partials/decision_result.html" %}
-</div>
+</section>

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Skipped mail{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="/">Queue</a> / Skipped mail</p>
+<div class="page-head">
+  <div>
+    <h1>Skipped mail</h1>
+    <p class="page-head__meta">{{ rows|length }} message{{ 's' if rows|length != 1 }} from the last scan matched no brand keyword, so they never reached the queue. Listed so nothing is silently lost — add a keyword in <a href="/config">Config</a> if one belongs.</p>
+  </div>
+</div>
+<section class="panel">
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th scope="col">Creator</th><th scope="col">Source</th><th scope="col">Received</th><th scope="col">Subject</th><th scope="col">Why skipped</th></tr></thead>
+      <tbody>
+        {% for s in rows %}
+        <tr>
+          <td>{{ creator_names.get(s['creator_id'], s['creator_id']) }}</td>
+          <td>{{ 'DM' if s['source'] == 'dm' else 'Email' }}</td>
+          <td>{{ s['received_at']|datetime_long }}</td>
+          <td>{{ s['subject'] or '(no subject)' }}</td>
+          <td class="muted">{{ s['reason'] }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="muted">Nothing skipped{{ '' if scanned else ' — no scan yet' }}.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

@@ -1,10 +1,11 @@
 """FastAPI app. Thin routes — everything that matters lives in pipeline.py / score.py
-/ quote.py; this file wires HTTP <-> those functions and renders Jinja2 templates.
+/ quote.py, and everything a screen shows is derived in view.py; this file wires HTTP
+to those and renders Jinja2 templates.
 """
 from __future__ import annotations
 
 import base64
-import uuid
+import datetime as dt
 from pathlib import Path
 
 import yaml
@@ -13,37 +14,30 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app import ai, db, pipeline
+from app import ai, db, fmt, pipeline, view
 from app.config_loader import load_config, reference_date, save_config
-from app.extract import extract_fields
 from app.reply import generate_reply
 from app.score import assess
 
 BASE_DIR = Path(__file__).resolve().parent
-app = FastAPI(title="Brand Deal Inbox Triage (SAMPLE DATA)")
+app = FastAPI(title="Deal Desk — Brand Deal Inbox Triage (SAMPLE DATA)")
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
-
-def _fmt_inr(amount) -> str:
-    if amount is None:
-        return "—"
-    n = int(round(amount))
-    s = str(n)
-    if len(s) <= 3:
-        return f"₹{s}"
-    last3 = s[-3:]
-    rest = s[:-3]
-    groups = []
-    while len(rest) > 2:
-        groups.insert(0, rest[-2:])
-        rest = rest[:-2]
-    if rest:
-        groups.insert(0, rest)
-    return "₹" + ",".join(groups + [last3])
-
-
-templates.env.filters["inr"] = _fmt_inr
+templates.env.filters.update(
+    inr=fmt.inr,
+    num_in=lambda n: fmt.group_in(n) if n is not None else "",
+    num_plain=lambda n: f"{n:g}" if isinstance(n, (int, float)) else n,
+    pct_num=lambda x: f"{x * 100:g}" if x is not None else "",
+    date_long=fmt.date_long,
+    date_short=fmt.date_short,
+    datetime_long=fmt.datetime_long,
+)
+templates.env.globals.update(
+    type_labels=view.TYPES, type_class=view.TYPE_CLASS, flag_meta=view.FLAGS,
+    flag_tiers=view.FLAG_TIERS, priorities=view.PRIORITIES,
+    deliverable_labels=view.DELIVERABLE_LABELS,
+)
 
 
 def _ensure_db() -> None:
@@ -59,63 +53,91 @@ def on_startup():
     _ensure_db()
 
 
-# -------------------------------------------------------------------------------
-# Triage queue
-# -------------------------------------------------------------------------------
+def _render(request: Request, name: str, ctx: dict, conn=None) -> HTMLResponse:
+    if "ai_on" not in ctx:
+        if conn is None:
+            with db.get_conn() as c:
+                ctx["ai_on"] = db.ai_enabled(c)
+        else:
+            ctx["ai_on"] = db.ai_enabled(conn)
+    return templates.TemplateResponse(request, name, ctx)
 
-@app.get("/", response_class=HTMLResponse)
-def queue_page(
-    request: Request, creator: str = "", type: str = "", flag: str = "", priority: str = "",
-):
-    with db.get_conn() as conn:
-        rows = db.list_inquiries_with_assessments(conn)
-        skipped = db.list_skipped(conn)
-        ai_on = db.ai_enabled(conn)
-        creators = db.list_creators(conn)
 
-    filtered = _filter_queue(rows, creator, type, flag, priority)
-    filtered.sort(key=lambda r: (_priority_rank(r["assessment"].priority), -r["assessment"].final_score))
-
-    return templates.TemplateResponse(
-        request,
-        "queue.html",
-        {
-            "rows": filtered, "skipped_count": len(skipped),
-            "skipped": skipped, "ai_on": ai_on, "creators": creators,
-            "filters": {"creator": creator, "type": type, "flag": flag, "priority": priority},
-            "has_data": len(rows) > 0,
-        },
-    )
+def _is_htmx(request: Request) -> bool:
+    return request.headers.get("HX-Request") == "true"
 
 
 def _priority_rank(p: str) -> int:
     return {"P1": 0, "P2": 1, "P3": 2, "Ignore": 3}.get(p, 4)
 
 
+def _sorted_rows(rows):
+    return sorted(rows, key=lambda r: (_priority_rank(r["assessment"].priority), -r["assessment"].final_score))
+
+
+# -------------------------------------------------------------------------------
+# Triage queue
+# -------------------------------------------------------------------------------
+
 def _filter_queue(rows, creator, type_, flag, priority):
     out = []
     for r in rows:
+        a = r["assessment"]
         if creator and r["inquiry"]["creator_id"] != creator:
             continue
-        if type_ and r["assessment"].type != type_:
+        if type_ and a.type != type_:
             continue
-        if flag and flag not in r["assessment"].flags:
+        if flag == "none" and a.flags:
             continue
-        if priority and r["assessment"].priority != priority:
+        if flag and flag != "none" and flag not in a.flags:
+            continue
+        if priority and a.priority != priority:
             continue
         out.append(r)
     return out
 
 
-@app.get("/partials/queue-list", response_class=HTMLResponse)
-def queue_list_partial(
-    request: Request, creator: str = "", type: str = "", flag: str = "", priority: str = "",
-):
+def _queue_context(conn, creator: str, type_: str, flag: str, priority: str) -> dict:
+    creators = db.list_creators(conn)
+    by_id = {c.id: c for c in creators}
+    rows = db.list_inquiries_with_assessments(conn)
+    filtered = _sorted_rows(_filter_queue(rows, creator, type_, flag, priority))
+    for r in filtered:
+        c = by_id[r["inquiry"]["creator_id"]]
+        r["flags"] = view.flag_list(r["assessment"].flags)
+        r["bvq"] = view.bvq(c, r["extraction"], r["assessment"])
+
+    active = []
+    if creator in by_id:
+        active.append(f"Creator: {by_id[creator].name}")
+    if type_:
+        active.append(f"Type: {view.TYPES.get(type_, type_)}")
+    if flag:
+        active.append("Flag: No flags" if flag == "none" else f"Flag: {view.FLAGS.get(flag, (flag,))[0]}")
+    if priority:
+        active.append(f"Priority: {priority}")
+
+    return {
+        "rows": filtered, "creators": creators, "has_data": bool(rows), "total": len(rows),
+        "creator_count": len({r["inquiry"]["creator_id"] for r in rows}),
+        "skipped_count": len(db.list_skipped(conn)), "last_scan": db.get_setting(conn, "last_scan"),
+        "filters": {"creator": creator, "type": type_, "flag": flag, "priority": priority},
+        "active_filters": active, "filter_creator": by_id.get(creator),
+        "filter_creator_count": sum(r["inquiry"]["creator_id"] == creator for r in rows),
+        "reference_date": reference_date(), "active": "queue",
+    }
+
+
+@app.get("/", response_class=HTMLResponse)
+def queue_page(request: Request, creator: str = "", type: str = "", flag: str = "", priority: str = ""):
     with db.get_conn() as conn:
-        rows = db.list_inquiries_with_assessments(conn)
-    filtered = _filter_queue(rows, creator, type, flag, priority)
-    filtered.sort(key=lambda r: (_priority_rank(r["assessment"].priority), -r["assessment"].final_score))
-    return templates.TemplateResponse(request, "partials/queue_list.html", {"rows": filtered})
+        return _render(request, "queue.html", _queue_context(conn, creator, type, flag, priority), conn)
+
+
+@app.get("/partials/queue-list", response_class=HTMLResponse)
+def queue_list_partial(request: Request, creator: str = "", type: str = "", flag: str = "", priority: str = ""):
+    with db.get_conn() as conn:
+        return _render(request, "partials/queue_list.html", _queue_context(conn, creator, type, flag, priority), conn)
 
 
 @app.post("/scan", response_class=HTMLResponse)
@@ -125,221 +147,359 @@ def scan_inboxes(request: Request):
     return RedirectResponse("/", status_code=303)
 
 
+@app.get("/skipped", response_class=HTMLResponse)
+def skipped_page(request: Request):
+    with db.get_conn() as conn:
+        ctx = {
+            "rows": db.list_skipped(conn),
+            "creator_names": {c.id: c.name for c in db.list_creators(conn)},
+            "scanned": bool(db.get_setting(conn, "last_scan")), "active": "queue",
+        }
+        return _render(request, "skipped.html", ctx, conn)
+
+
 # -------------------------------------------------------------------------------
 # Inquiry detail
 # -------------------------------------------------------------------------------
 
+def _inquiry_context(conn, inquiry_id: str, *, prev_assessment=None, prev_uncapped=None,
+                     edited_field: str | None = None, edit_error: str | None = None) -> dict:
+    inquiry = db.get_inquiry(conn, inquiry_id)
+    if inquiry is None:
+        raise HTTPException(status_code=404, detail="Inquiry not found")
+    creator = db.get_creator(conn, inquiry["creator_id"])
+    ext = db.get_extraction(conn, inquiry_id)
+    a = db.get_assessment(conn, inquiry_id)
+    ai_on = db.ai_enabled(conn)
+    ref = reference_date()
+    raw, domain = inquiry["raw_text"], inquiry["sender_domain"]
+
+    flags = view.flag_list(a.flags)
+    for f in flags:
+        f["why"] = view.flag_reason(f["key"], creator, ext, a, ref, raw, domain)
+
+    uncapped = None
+    if "conflict" in a.flags and "no_go" not in a.flags:
+        uncapped = view.uncapped_score(creator, ext, ref, raw, domain, "duplicate" in a.flags)
+
+    cleared, cleared_why = [], ""
+    stamp = ""
+    if prev_assessment is not None and not edit_error:
+        cleared = view.flag_list([f for f in prev_assessment.flags if f not in a.flags])
+        if any(f["key"] == "lowball" for f in cleared) and a.rate_fit_pct is not None:
+            cleared_why = f"{fmt.inr(a.offer_value)} is {a.rate_fit_pct:.0f}% of the quote."
+        moved = int(prev_assessment.final_score) != int(a.final_score)
+        change = (f"score {int(prev_assessment.final_score)} → {int(a.final_score)}" if moved
+                  else ("score unchanged, still capped" if uncapped else "score unchanged"))
+        stamp = f"Re-scored after you edited {view.field_label(edited_field)} · {change}"
+    elif db.get_setting(conn, "last_scan"):
+        stamp = f"Scored {fmt.datetime_long(db.get_setting(conn, 'last_scan'))}"
+
+    order = [r["inquiry"]["id"] for r in _sorted_rows(db.list_inquiries_with_assessments(conn))]
+    pos = order.index(inquiry_id) if inquiry_id in order else None
+    nav = {
+        "position": pos + 1 if pos is not None else None, "total": len(order),
+        "prev_id": order[pos - 1] if pos else None,
+        "next_id": order[pos + 1] if pos is not None and pos + 1 < len(order) else None,
+    }
+
+    return {
+        "inquiry": inquiry, "creator": creator, "extraction": ext, "assessment": a,
+        "fields": view.field_rows(ext), "flags": flags, "bvq": view.bvq(creator, ext, a),
+        "quote_rows": view.quote_rows(creator, ext, a), "uncapped": uncapped,
+        "prev_uncapped": prev_uncapped, "cleared": cleared, "cleared_why": cleared_why,
+        "rec": view.recommendation(creator, a), "stamp": stamp, "edit_error": edit_error,
+        "reply_draft": generate_reply(creator, ext, a, ai_on),
+        "decision": view.decision_view(db.get_decision_for_inquiry(conn, inquiry_id), creator),
+        "nav": nav, "ai_on": ai_on, "active": "queue",
+    }
+
+
 @app.get("/inquiry/{inquiry_id}", response_class=HTMLResponse)
 def inquiry_detail(request: Request, inquiry_id: str):
     with db.get_conn() as conn:
-        inquiry = db.get_inquiry(conn, inquiry_id)
-        if inquiry is None:
-            raise HTTPException(status_code=404, detail="Inquiry not found")
-        extraction = db.get_extraction(conn, inquiry_id)
-        assessment = db.get_assessment(conn, inquiry_id)
-        creator = db.get_creator(conn, inquiry["creator_id"])
-        ai_on = db.ai_enabled(conn)
-        decision = db.get_decision_for_inquiry(conn, inquiry_id)
-        reply_draft = generate_reply(creator, extraction, assessment, ai_on)
-
-    return templates.TemplateResponse(
-        request,
-        "inquiry_detail.html",
-        {
-            "inquiry": inquiry, "extraction": extraction,
-            "assessment": assessment, "creator": creator, "ai_on": ai_on,
-            "decision": decision, "reply_draft": reply_draft,
-        },
-    )
+        return _render(request, "inquiry_detail.html", _inquiry_context(conn, inquiry_id), conn)
 
 
 @app.post("/inquiry/{inquiry_id}/edit", response_class=HTMLResponse)
 def edit_field(request: Request, inquiry_id: str, field: str = Form(...), value: str = Form("")):
-    edit_error = None
     with db.get_conn() as conn:
         inquiry = db.get_inquiry(conn, inquiry_id)
         if inquiry is None:
             raise HTTPException(status_code=404, detail="Inquiry not found")
+        prev = db.get_assessment(conn, inquiry_id)
+        prev_uncapped = None
+        if prev and "conflict" in prev.flags:
+            prev_uncapped = int(view.uncapped_score(
+                db.get_creator(conn, inquiry["creator_id"]), db.get_extraction(conn, inquiry_id),
+                reference_date(), inquiry["raw_text"], inquiry["sender_domain"], "duplicate" in prev.flags,
+            ).final_score)
+        error = None
         try:
-            assessment = pipeline.reassess_inquiry(conn, inquiry_id, field, value)
+            pipeline.reassess_inquiry(conn, inquiry_id, field, value)
         except ValueError as e:
-            # 200, not 4xx: HTMX only swaps successful responses, and the manager
-            # needs to see why the edit didn't take.
-            edit_error = f"Couldn't save {field.replace('_', ' ')}: {e}"
-            assessment = db.get_assessment(conn, inquiry_id)
-        extraction = db.get_extraction(conn, inquiry_id)
-        creator = db.get_creator(conn, inquiry["creator_id"])
-        ai_on = db.ai_enabled(conn)
-        reply_draft = generate_reply(creator, extraction, assessment, ai_on)
+            error = f"Couldn't save {view.field_label(field)}: {e}"
 
-    return templates.TemplateResponse(
-        request,
-        "partials/assessment.html",
-        {
-            "inquiry": inquiry, "extraction": extraction,
-            "assessment": assessment, "creator": creator, "reply_draft": reply_draft,
-            "decision": None, "edit_error": edit_error,
-        },
-    )
+        if not _is_htmx(request):
+            return RedirectResponse(f"/inquiry/{inquiry_id}", status_code=303)
+
+        ctx = _inquiry_context(conn, inquiry_id, prev_assessment=prev, prev_uncapped=prev_uncapped,
+                               edited_field=field, edit_error=error)
+        row = next((f for f in ctx["fields"] if f["name"] == field), None)
+        if row is not None and error:
+            row["value"] = value
+        ctx.update(oob_field=row, oob_error=error)
+        # 200 even on a bad value: HTMX only swaps successful responses, and the
+        # manager needs to see why the edit didn't take.
+        return _render(request, "partials/edit_response.html", ctx, conn)
 
 
 @app.post("/inquiry/{inquiry_id}/reextract", response_class=HTMLResponse)
 def reextract(request: Request, inquiry_id: str):
     with db.get_conn() as conn:
-        assessment = pipeline.reextract_inquiry(conn, inquiry_id, ai_on_override=False)
-        inquiry = db.get_inquiry(conn, inquiry_id)
-        extraction = db.get_extraction(conn, inquiry_id)
-        creator = db.get_creator(conn, inquiry["creator_id"])
-        reply_draft = generate_reply(creator, extraction, assessment, False)
-
-    return templates.TemplateResponse(
-        request,
-        "partials/assessment.html",
-        {
-            "inquiry": inquiry, "extraction": extraction,
-            "assessment": assessment, "creator": creator, "reply_draft": reply_draft,
-            "decision": None,
-        },
-    )
+        if db.get_inquiry(conn, inquiry_id) is None:
+            raise HTTPException(status_code=404, detail="Inquiry not found")
+        pipeline.reextract_inquiry(conn, inquiry_id, ai_on_override=False)
+        if not _is_htmx(request):
+            return RedirectResponse(f"/inquiry/{inquiry_id}", status_code=303)
+        ctx = _inquiry_context(conn, inquiry_id)
+        ctx["stamp"] = "Re-extracted with rules only · your edits were discarded"
+        ctx["refresh_fields"] = True
+        return _render(request, "partials/edit_response.html", ctx, conn)
 
 
 @app.post("/inquiry/{inquiry_id}/decision", response_class=HTMLResponse)
-def make_decision(
-    request: Request, inquiry_id: str, action: str = Form(...), reply_text: str = Form(""),
-):
+def make_decision(request: Request, inquiry_id: str, action: str = Form(...),
+                  reply_text: str = Form(""), draft: str = Form("")):
     with db.get_conn() as conn:
-        db.save_decision(conn, inquiry_id, action, reply_text)
-        decision = db.get_decision_for_inquiry(conn, inquiry_id)
-
-    return templates.TemplateResponse(
-        request,
-        "partials/decision_result.html",
-        {"decision": decision},
-    )
+        inquiry = db.get_inquiry(conn, inquiry_id)
+        if inquiry is None:
+            raise HTTPException(status_code=404, detail="Inquiry not found")
+        edited = action != "mark_spam" and reply_text.strip() != draft.strip()
+        db.save_decision(conn, inquiry_id, action, reply_text if edited else "")
+        if not _is_htmx(request):
+            return RedirectResponse(f"/inquiry/{inquiry_id}", status_code=303)
+        creator = db.get_creator(conn, inquiry["creator_id"])
+        decision = view.decision_view(db.get_decision_for_inquiry(conn, inquiry_id), creator)
+        return _render(request, "partials/decision_result.html", {"decision": decision}, conn)
 
 
 # -------------------------------------------------------------------------------
-# Creator page
+# Creators
 # -------------------------------------------------------------------------------
+
+@app.get("/creators", response_class=HTMLResponse)
+def creators_page(request: Request):
+    with db.get_conn() as conn:
+        rows = db.list_inquiries_with_assessments(conn)
+        ref = reference_date()
+        out = []
+        for c in db.list_creators(conn):
+            partners = [view.partner_view(p, ref) for p in c.active_partners]
+            out.append({
+                "creator": c, "capacity": view.capacity_view(c),
+                "active_exclusives": [p for p in partners if p["state"] == "active"],
+                "count": sum(r["inquiry"]["creator_id"] == c.id for r in rows),
+            })
+        return _render(request, "creators.html", {"rows": out, "active": "creators"}, conn)
+
+
+def _creator_context(conn, creator_id: str, **extra) -> dict:
+    creator = db.get_creator(conn, creator_id)
+    if creator is None:
+        raise HTTPException(status_code=404, detail="Creator not found")
+    ref = reference_date()
+    history = []
+    for r in db.list_inquiries_with_assessments(conn):
+        if r["inquiry"]["creator_id"] != creator_id:
+            continue
+        d = db.get_decision_for_inquiry(conn, r["inquiry"]["id"])
+        outcome = view.OUTCOMES.get(d["action"], ("Logged", "open")) if d else ("In queue", "open")
+        history.append({
+            "id": r["inquiry"]["id"], "received": r["inquiry"]["received_at"],
+            "brand": r["extraction"].brand or r["inquiry"]["sender_domain"],
+            "score": int(r["assessment"].final_score), "offer": r["assessment"].offer_value,
+            "outcome": outcome,
+        })
+    history.sort(key=lambda h: h["received"], reverse=True)
+    cfg = load_config()
+    return {
+        "creator": creator, "initials": view.initials(creator.name),
+        "partners": [view.partner_view(p, ref) for p in creator.active_partners],
+        "capacity": view.capacity_view(creator), "history": history,
+        "month_label": f"{ref:%B %Y}", "bundle_min": cfg["bundle_discount_min_deliverables"],
+        "global_no_go": cfg["global_no_go_categories"], "active": "creators", **extra,
+    }
+
 
 @app.get("/creator/{creator_id}", response_class=HTMLResponse)
-def creator_page(request: Request, creator_id: str):
+def creator_page(request: Request, creator_id: str, saved: int = 0, rescored: int = 0):
+    with db.get_conn() as conn:
+        return _render(request, "creator.html",
+                       _creator_context(conn, creator_id, saved=saved, rescored=rescored), conn)
+
+
+def _number(raw: str | None, label: str, *, pct: bool = False, integer: bool = False):
+    """Form numbers as people type them: '62,000', '₹62000', '10' (percent)."""
+    if raw is None or raw.strip() == "":
+        return None
+    text = raw.replace(",", "").replace("₹", "").replace("%", "").strip()
+    try:
+        value = float(text)
+    except ValueError:
+        raise ValueError(f"{label} must be a number, got '{raw}'.") from None
+    if value < 0:
+        raise ValueError(f"{label} can't be negative.")
+    if pct:
+        value /= 100
+    return int(value) if integer else value
+
+
+@app.post("/creator/{creator_id}/update")
+async def update_creator(request: Request, creator_id: str):
+    form = await request.form()
     with db.get_conn() as conn:
         creator = db.get_creator(conn, creator_id)
         if creator is None:
             raise HTTPException(status_code=404, detail="Creator not found")
-        rows = db.list_inquiries_with_assessments(conn)
-        ai_on = db.ai_enabled(conn)
-    history = [r for r in rows if r["inquiry"]["creator_id"] == creator_id]
-    return templates.TemplateResponse(
-        request,
-        "creator.html",
-        {"creator": creator, "history": history, "ai_on": ai_on,
-         "ref_date": reference_date()},
-    )
+        try:
+            rates = {k: _number(form.get(k), label) for k, label in
+                     [("reel", "Reel"), ("story", "Story"), ("static_post", "Static post"), ("carousel", "Carousel")]}
+            bundle = _number(form.get("bundle_discount_pct"), "Bundle discount", pct=True)
+            minimum = _number(form.get("min_acceptable_pct"), "Minimum acceptable", pct=True)
+            barter_min = _number(form.get("barter_min_product_value"), "Barter minimum")
+            usage_default = _number(form.get("usage_rights_default_days"), "Usage rights default", integer=True)
+            usage_free = _number(form.get("max_usage_days_without_extra_fee"), "Max usage", integer=True)
+            capacity = _number(form.get("max_paid_deals_per_month"), "Monthly capacity", integer=True)
+            if bundle is not None and bundle >= 1 or minimum is not None and minimum > 1:
+                raise ValueError("Percentages must be between 0 and 100.")
+        except ValueError as e:
+            return _render(request, "creator.html", _creator_context(conn, creator_id, error=str(e)), conn)
+
+        for k, v in rates.items():
+            if v is not None:
+                setattr(creator.rate_card, k, v)
+        if bundle is not None:
+            creator.rate_card.bundle_discount_pct = bundle
+        if minimum is not None:
+            creator.min_acceptable_pct = minimum
+        if "accepts_barter" in form:
+            creator.accepts_barter = str(form.get("accepts_barter")).lower() in ("yes", "true", "on", "1")
+        if barter_min is not None:
+            creator.barter_min_product_value = barter_min
+        if usage_default is not None:
+            creator.usage_rights_default_days = usage_default
+        if usage_free is not None:
+            creator.max_usage_days_without_extra_fee = usage_free
+        if capacity is not None:
+            creator.max_paid_deals_per_month = capacity
+        db.save_creator(conn, creator)
+        count = pipeline.rescore_inquiries(conn, creator_id)
+    return RedirectResponse(f"/creator/{creator_id}?saved=1&rescored={count}", status_code=303)
 
 
-@app.post("/creator/{creator_id}/update")
-def update_creator(
-    request: Request, creator_id: str,
-    reel: float = Form(...), story: float = Form(...), static_post: float = Form(...),
-    carousel: float = Form(...), bundle_discount_pct: float = Form(...),
-    min_acceptable_pct: float = Form(...), accepts_barter: bool = Form(False),
-    barter_min_product_value: float = Form(0),
-    usage_rights_default_days: int = Form(30), max_usage_days_without_extra_fee: int = Form(30),
-):
+@app.post("/creator/{creator_id}/nogo")
+def update_nogo(creator_id: str, add: str = Form(""), remove: str = Form("")):
     with db.get_conn() as conn:
         creator = db.get_creator(conn, creator_id)
-        creator.rate_card.reel = reel
-        creator.rate_card.story = story
-        creator.rate_card.static_post = static_post
-        creator.rate_card.carousel = carousel
-        creator.rate_card.bundle_discount_pct = bundle_discount_pct
-        creator.min_acceptable_pct = min_acceptable_pct
-        creator.accepts_barter = accepts_barter
-        creator.barter_min_product_value = barter_min_product_value
-        creator.usage_rights_default_days = usage_rights_default_days
-        creator.max_usage_days_without_extra_fee = max_usage_days_without_extra_fee
+        if creator is None:
+            raise HTTPException(status_code=404, detail="Creator not found")
+        cats = [c for c in creator.no_go_categories if c != remove.strip().lower()]
+        new = add.strip().lower()
+        if new and new not in cats:
+            cats.append(new)
+        creator.no_go_categories = cats
         db.save_creator(conn, creator)
-
-        # Existing inquiries for this creator re-score against the new rate card —
-        # "editable" means it changes outcomes, not just the displayed number.
-        ref_date = reference_date()
-        for row in db.list_inquiries(conn):
-            if row["creator_id"] != creator_id:
-                continue
-            ext = db.get_extraction(conn, row["id"])
-            prev = db.get_assessment(conn, row["id"])
-            a = assess(
-                creator, ext, ref_date, raw_text=row["raw_text"],
-                sender_domain=row["sender_domain"],
-                is_duplicate="duplicate" in (prev.flags if prev else []),
-            )
-            db.save_assessment(conn, row["id"], a)
-
-    return RedirectResponse(f"/creator/{creator_id}", status_code=303)
+        count = pipeline.rescore_inquiries(conn, creator_id)
+    return RedirectResponse(f"/creator/{creator_id}?saved=1&rescored={count}", status_code=303)
 
 
 # -------------------------------------------------------------------------------
-# DM intake
+# DM intake — paste/screenshot -> preview -> add to queue
 # -------------------------------------------------------------------------------
+
+DM_PREVIEW_FIELDS = ["brand", "brand_category", "budget_amount", "product_value", "deliverables",
+                     "go_live_date", "usage_rights_days", "payment_advance_pct", "payment_net_days"]
+
+
+def _dm_context(conn, *, form=None, preview=None, error=None) -> dict:
+    return {
+        "creators": db.list_creators(conn), "preview": preview, "error": error,
+        "form": form or {"creator_id": "", "sender": "", "dm_text": ""}, "active": "dm",
+    }
+
+
+def _dm_preview(conn, creator_id: str, text: str, ext, *, from_screenshot=False, values=None, errors=None):
+    creator = db.get_creator(conn, creator_id)
+    a = assess(creator, ext, reference_date(), raw_text=text, sender_domain=pipeline.DM_DOMAIN)
+    fields = [f for f in view.field_rows(ext) if f["name"] in DM_PREVIEW_FIELDS]
+    for f in fields:
+        f["original"] = f["value"]
+        if values and f["name"] in values:
+            f["value"] = values[f["name"]]
+    return {"fields": fields, "flags": view.flag_list(a.flags), "text": text,
+            "from_screenshot": from_screenshot, "errors": errors or {}}
+
 
 @app.get("/dm", response_class=HTMLResponse)
 def dm_intake_page(request: Request):
     with db.get_conn() as conn:
-        creators = db.list_creators(conn)
-        ai_on = db.ai_enabled(conn)
-    return templates.TemplateResponse(
-        request, "dm_intake.html", {"creators": creators, "ai_on": ai_on, "preview": None},
-    )
+        return _render(request, "dm_intake.html", _dm_context(conn), conn)
 
 
 @app.post("/dm/process", response_class=HTMLResponse)
-async def dm_process(
-    request: Request, creator_id: str = Form(...), dm_text: str = Form(""),
-    screenshot: UploadFile | None = None,
-):
+async def dm_process(request: Request, creator_id: str = Form(...), dm_text: str = Form(""),
+                     sender: str = Form(""), screenshot: UploadFile | None = None):
     with db.get_conn() as conn:
-        creators = db.list_creators(conn)
-        creator = db.get_creator(conn, creator_id)
+        if db.get_creator(conn, creator_id) is None:
+            raise HTTPException(status_code=404, detail="Creator not found")
         ai_on = db.ai_enabled(conn)
-        ref_date = reference_date()
-
-        text = dm_text
-        if (not text) and screenshot is not None and ai_on:
+        form = {"creator_id": creator_id, "sender": sender, "dm_text": dm_text}
+        text, from_screenshot = dm_text.strip(), False
+        if not text and screenshot is not None and screenshot.filename and ai_on:
             content = await screenshot.read()
-            b64 = base64.b64encode(content).decode()
-            ocr_text = ai.ocr_screenshot_ai(b64)
-            text = ocr_text or ""
+            text = (ai.ocr_screenshot_ai(base64.b64encode(content).decode()) or "").strip()
+            from_screenshot = True
+            if not text:
+                return _render(request, "dm_intake.html", _dm_context(
+                    conn, form=form, error="Couldn't read that screenshot — AI isn't configured or the image was unclear. Paste the text instead."), conn)
+        if not text:
+            return _render(request, "dm_intake.html", _dm_context(
+                conn, form=form, error="Paste the DM text first."), conn)
+        ext = pipeline.extract_dm(text, ai_on)
+        preview = _dm_preview(conn, creator_id, text, ext, from_screenshot=from_screenshot)
+        return _render(request, "dm_intake.html", _dm_context(conn, form=form, preview=preview), conn)
 
-        preview = None
-        new_inquiry_id = None
-        if text.strip():
-            ext = extract_fields(text, "", "instagram.com", ref_date) if not ai_on else (
-                ai.extract_with_ai(text, "", ref_date) or extract_fields(text, "", "instagram.com", ref_date)
-            )
-            a = assess(creator, ext, ref_date, raw_text=text, sender_domain="instagram.com")
-            import datetime as dt
-            new_inquiry_id = f"dm_{int(dt.datetime.now().timestamp())}_{uuid.uuid4().hex[:6]}"
-            db.save_inquiry(
-                conn, inquiry_id=new_inquiry_id, creator_id=creator_id, source="dm",
-                received_at=dt.datetime.now(), sender_name="DM intake", sender_email_or_handle="",
-                sender_domain="instagram.com", raw_text=text, subject="",
-                thread_key=f"{creator_id}::{(ext.brand or 'unknown').lower()}",
-                message_ids=[new_inquiry_id],
-            )
-            db.save_extraction(conn, new_inquiry_id, ext)
-            db.save_assessment(conn, new_inquiry_id, a)
-            preview = {"extraction": ext, "assessment": a}
 
-    if new_inquiry_id:
-        return RedirectResponse(f"/inquiry/{new_inquiry_id}", status_code=303)
-
-    return templates.TemplateResponse(
-        request,
-        "dm_intake.html",
-        {"creators": creators, "ai_on": ai_on, "preview": preview},
-    )
+@app.post("/dm/commit")
+async def dm_commit(request: Request):
+    form = await request.form()
+    creator_id, sender, text = form.get("creator_id", ""), form.get("sender", ""), form.get("dm_text", "")
+    with db.get_conn() as conn:
+        if db.get_creator(conn, creator_id) is None:
+            raise HTTPException(status_code=404, detail="Creator not found")
+        if not text.strip():
+            return RedirectResponse("/dm", status_code=303)
+        ext = pipeline.extract_dm(text, db.ai_enabled(conn))
+        values, errors = {}, {}
+        for name in DM_PREVIEW_FIELDS:
+            submitted = str(form.get(f"f_{name}", ""))
+            values[name] = submitted
+            try:
+                setattr(ext, name, pipeline.parse_field(name, submitted))
+            except ValueError as e:
+                errors[name] = str(e)
+                continue
+            if submitted.strip() != str(form.get(f"o_{name}", "")).strip():
+                ext.provenance[name] = "manual"
+        if errors:
+            preview = _dm_preview(conn, creator_id, text, pipeline.extract_dm(text, db.ai_enabled(conn)),
+                                  values=values, errors=errors)
+            ctx = _dm_context(conn, form={"creator_id": creator_id, "sender": sender, "dm_text": text},
+                              preview=preview, error="Fix the highlighted fields, then add it again.")
+            return _render(request, "dm_intake.html", ctx, conn)
+        inquiry_id = pipeline.add_dm_inquiry(conn, creator_id, text, sender.strip(), ext)
+    return RedirectResponse(f"/inquiry/{inquiry_id}", status_code=303)
 
 
 # -------------------------------------------------------------------------------
@@ -350,77 +510,154 @@ async def dm_process(
 def pipeline_summary(request: Request):
     with db.get_conn() as conn:
         rows = db.list_inquiries_with_assessments(conn)
-        skipped = db.list_skipped(conn)
-        decisions = db.list_decisions(conn)
         creators = db.list_creators(conn)
-        ai_on = db.ai_enabled(conn)
+        by_id = {c.id: c for c in creators}
+        inquiries = {r["inquiry"]["id"]: r for r in rows}
 
-    counts = {"P1": 0, "P2": 0, "P3": 0, "Ignore": 0}
-    value_p1 = 0.0
-    value_p2 = 0.0
-    conflicts_caught = 0
-    deals_per_creator = {c.id: 0 for c in creators}
-    for r in rows:
-        a = r["assessment"]
-        counts[a.priority] = counts.get(a.priority, 0) + 1
-        if a.priority == "P1" and a.offer_value:
-            value_p1 += a.offer_value
-        if a.priority == "P2" and a.offer_value:
-            value_p2 += a.offer_value
-        if "conflict" in a.flags:
-            conflicts_caught += 1
-        creator_id = r["inquiry"]["creator_id"]
-        deals_per_creator[creator_id] = deals_per_creator.get(creator_id, 0) + 1
+        counts = {p: 0 for p in view.PRIORITIES}
+        value_p1 = value_p2 = 0.0
+        conflicts = []
+        for r in sorted(rows, key=lambda r: r["inquiry"]["received_at"], reverse=True):
+            a = r["assessment"]
+            counts[a.priority] = counts.get(a.priority, 0) + 1
+            if a.priority == "P1" and a.offer_value:
+                value_p1 += a.offer_value
+            if a.priority == "P2" and a.offer_value:
+                value_p2 += a.offer_value
+            if "conflict" in a.flags:
+                conflicts.append(f"{r['extraction'].brand} → {r['inquiry']['creator_name']}")
 
-    return templates.TemplateResponse(
-        request,
-        "pipeline.html",
-        {
-            "counts": counts, "value_p1": value_p1, "value_p2": value_p2,
-            "conflicts_caught": conflicts_caught, "deals_per_creator": deals_per_creator,
-            "creators": {c.id: c for c in creators}, "skipped_count": len(skipped),
-            "decisions": decisions, "ai_on": ai_on,
-        },
-    )
+        per = {c.id: 0 for c in creators}
+        for r in rows:
+            per[r["inquiry"]["creator_id"]] = per.get(r["inquiry"]["creator_id"], 0) + 1
+        top = max(per.values(), default=0) or 1
+        per_creator = sorted(
+            ({"creator": by_id[cid], "count": n, "fill": int(round(n / top * 20)) * 5} for cid, n in per.items()),
+            key=lambda d: -d["count"],
+        )
+
+        decisions = []
+        for d in db.list_decisions(conn):
+            r = inquiries.get(d["inquiry_id"])
+            decisions.append({
+                "timestamp": d["timestamp"], "inquiry_id": d["inquiry_id"], "exists": r is not None,
+                "creator": r["inquiry"]["creator_name"] if r else "—",
+                "brand": (r["extraction"].brand or r["inquiry"]["sender_domain"]) if r else f"{d['inquiry_id']} (cleared by rescan)",
+                "outcome": view.OUTCOMES.get(d["action"], (d["action"], "open")),
+                "edited": None if d["action"] == "mark_spam" else bool(d["edited_reply"]),
+            })
+
+        ctx = {
+            "counts": counts, "value_p1": value_p1, "value_p2": value_p2, "conflicts": conflicts,
+            "per_creator": per_creator, "creators": creators, "total": len(rows),
+            "skipped_count": len(db.list_skipped(conn)), "decisions": decisions,
+            "last_scan": db.get_setting(conn, "last_scan"), "active": "pipeline",
+        }
+        return _render(request, "pipeline.html", ctx, conn)
 
 
 # -------------------------------------------------------------------------------
 # Config
 # -------------------------------------------------------------------------------
 
-@app.get("/config", response_class=HTMLResponse)
-def config_page(request: Request):
+def _config_context(conn, *, cfg=None, raw_yaml=None, error=None, saved=False, rescored=0) -> dict:
+    cfg = cfg or load_config(force_reload=True)
+    return {
+        "cfg": cfg, "cfg_yaml": yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True),
+        "raw_yaml": raw_yaml, "error": error, "saved": saved, "rescored": rescored,
+        "inquiry_count": len(db.list_inquiries(conn)), "active": "config",
+    }
+
+
+def _lines(text: str) -> list[str]:
+    return [line.strip() for line in (text or "").splitlines() if line.strip()]
+
+
+def _config_from_form(form) -> dict:
     cfg = load_config(force_reload=True)
+    cfg = yaml.safe_load(yaml.safe_dump(cfg))  # a deep copy we can mutate
+    num = lambda key, label, **kw: _number(form.get(key), label, **kw)  # noqa: E731
+
+    ref = (form.get("reference_date") or "").strip()
+    if ref:
+        dt.date.fromisoformat(ref)
+    cfg["reference_date"] = ref
+
+    for key in cfg["scoring_weights"]:
+        v = num(f"w_{key}", f"Weight {key.replace('_', ' ')}")
+        if v is not None:
+            cfg["scoring_weights"][key] = v
+    if abs(sum(cfg["scoring_weights"].values()) - 100) > 1e-9:
+        raise ValueError(f"Scoring weights must total 100 (they total {sum(cfg['scoring_weights'].values()):g}).")
+    for key in cfg["risk_penalty"]:
+        v = num(f"pen_{key}", f"Penalty {key.replace('_', ' ')}")
+        if v is not None:
+            cfg["risk_penalty"][key] = v
+    for key in cfg["priority_bands"]:
+        v = num(f"band_{key}", f"Priority band {key}")
+        if v is not None:
+            cfg["priority_bands"][key] = v
+    b = cfg["priority_bands"]
+    if not b["p1_min"] > b["p2_min"] > b["p3_min"]:
+        raise ValueError("Priority bands must go down: P1 > P2 > P3.")
+    for key, label in [("urgency_days_high", "Urgent window"), ("urgency_days_medium", "Urgency window"),
+                       ("duplicate_window_days", "Duplicate window")]:
+        v = num(key, label, integer=True)
+        if v is not None:
+            cfg[key] = v
+    for key, label in [("min_acceptable_pct_default", "Default minimum acceptable"),
+                       ("usage_fee_pct_per_30_days", "Usage fee"), ("whitelisting_fee_pct", "Whitelisting fee"),
+                       ("exclusivity_fee_pct", "Exclusivity fee")]:
+        v = num(key, label, pct=True)
+        if v is not None:
+            cfg[key] = v
+
+    if "keywords" in form:
+        cfg["keywords"] = [k.lower() for k in _lines(form.get("keywords"))]
+        if not cfg["keywords"]:
+            raise ValueError("Keep at least one brand keyword, or every message is skipped.")
+    if "global_no_go_categories" in form:
+        cfg["global_no_go_categories"] = [k.lower() for k in _lines(form.get("global_no_go_categories"))]
+    for key in ("pay_to_join_phrases", "crypto_forex_terms", "shortened_link_domains", "free_mail_domains"):
+        if f"spam_{key}" in form:
+            cfg["spam_patterns"][key] = _lines(form.get(f"spam_{key}"))
+
+    brands, cats = form.getlist("lk_brand"), form.getlist("lk_cat")
+    if brands:
+        remove = form.get("remove")
+        lookup = {}
+        for i, (brand, cat) in enumerate(zip(brands, cats)):
+            if remove is not None and str(i) == remove:
+                continue
+            if brand.strip() and cat.strip():
+                lookup[brand.strip().lower()] = cat.strip().lower()
+        cfg["brand_category_lookup"] = lookup
+    return cfg
+
+
+@app.get("/config", response_class=HTMLResponse)
+def config_page(request: Request, saved: int = 0, rescored: int = 0):
     with db.get_conn() as conn:
-        ai_on = db.ai_enabled(conn)
-    return templates.TemplateResponse(
-        request, "config.html", {"cfg": cfg, "raw_yaml": None, "ai_on": ai_on},
-    )
+        return _render(request, "config.html", _config_context(conn, saved=bool(saved), rescored=rescored), conn)
 
 
 @app.post("/config/update", response_class=HTMLResponse)
-def config_update(request: Request, raw_yaml: str = Form(...)):
+async def config_update(request: Request):
     from app.schemas import ConfigModel
 
+    form = await request.form()
+    raw_yaml = form.get("raw_yaml")
     with db.get_conn() as conn:
-        ai_on = db.ai_enabled(conn)
-
-    error = None
-    try:
-        parsed = yaml.safe_load(raw_yaml)
-        ConfigModel(**parsed)  # pydantic validation before writing back
+        try:
+            parsed = yaml.safe_load(raw_yaml) if raw_yaml is not None else _config_from_form(form)
+            if not isinstance(parsed, dict):
+                raise ValueError("The config must be a YAML mapping of keys to values.")
+            ConfigModel(**parsed)  # pydantic validation before writing back
+        except Exception as e:  # noqa: BLE001 — surface the validation error in the form
+            return _render(request, "config.html", _config_context(conn, raw_yaml=raw_yaml, error=str(e)), conn)
         save_config(parsed)
-        cfg = load_config(force_reload=True)
-    except Exception as e:  # noqa: BLE001 — surface the validation error in the form
-        error = str(e)
-        cfg = load_config(force_reload=True)
-
-    return templates.TemplateResponse(
-        request,
-        "config.html",
-        {"cfg": cfg, "raw_yaml": raw_yaml if error else None,
-         "error": error, "ai_on": ai_on},
-    )
+        count = pipeline.rescore_inquiries(conn)
+    return RedirectResponse(f"/config?saved=1&rescored={count}", status_code=303)
 
 
 # -------------------------------------------------------------------------------

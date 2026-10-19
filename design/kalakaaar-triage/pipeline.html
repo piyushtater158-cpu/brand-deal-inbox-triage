@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pipeline · Deal Desk</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="sample-band" role="note"><span class="sample-band__tag">SAMPLE DATA</span> Every creator, brand, message and amount on this screen is synthetic.</div>
+<header class="topbar">
+  <div class="topbar__inner">
+    <a class="topbar__brand" href="queue.html">Deal Desk <span class="topbar__agency">Kalakaaar Talent</span></a>
+    <nav class="nav" aria-label="Main">
+      <a class="nav__link" href="queue.html">Queue</a>
+      <a class="nav__link" href="dm.html">DM intake</a>
+      <a class="nav__link" href="creator.html">Creators</a>
+      <a class="nav__link" href="pipeline.html" aria-current="page">Pipeline</a>
+      <a class="nav__link" href="config.html">Config</a>
+    </nav>
+    <form class="ai-toggle ai-toggle--on" method="post" action="/settings/ai">
+      <input type="hidden" name="ai" value="off">
+      <button class="ai-toggle__btn" type="submit" aria-pressed="true"><span class="ai-toggle__light" aria-hidden="true"></span>AI ON <span class="ai-toggle__hint">click to turn off</span></button>
+    </form>
+  </div>
+</header>
+
+<main class="page stack">
+  <div class="page-head">
+    <div>
+      <h1>Pipeline</h1>
+      <p class="page-head__meta">October 2026 · 30 inquiries across 5 creators · read-only · as of 19 Oct 2026, 15:30</p>
+    </div>
+  </div>
+
+  <section class="kpis" aria-label="Counts">
+    <div class="kpi kpi--headline">
+      <p class="kpi__label"><svg class="i i--lg" width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.2 1.5h5.6l3.7 3.7v5.6l-3.7 3.7H5.2l-3.7-3.7V5.2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M5 8h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Conflicts caught</p>
+      <p class="kpi__num">2</p>
+      <p class="kpi__sub">Offers that would have broken a signed exclusivity. Latest: Nivara Soaps → Aanya Mehra.</p>
+    </div>
+    <div class="kpi">
+      <p class="kpi__label"><span class="pri pri--p1"><span class="pri__bars" aria-hidden="true"><span class="pri__bar is-on"></span><span class="pri__bar is-on"></span><span class="pri__bar is-on"></span></span>P1</span></p>
+      <p class="kpi__num">7</p>
+    </div>
+    <div class="kpi">
+      <p class="kpi__label"><span class="pri pri--p2"><span class="pri__bars" aria-hidden="true"><span class="pri__bar is-on"></span><span class="pri__bar is-on"></span><span class="pri__bar"></span></span>P2</span></p>
+      <p class="kpi__num">9</p>
+    </div>
+    <div class="kpi">
+      <p class="kpi__label"><span class="pri pri--p3"><span class="pri__bars" aria-hidden="true"><span class="pri__bar is-on"></span><span class="pri__bar"></span><span class="pri__bar"></span></span>P3</span></p>
+      <p class="kpi__num">6</p>
+    </div>
+    <div class="kpi">
+      <p class="kpi__label"><span class="pri pri--ignore"><span class="pri__bars" aria-hidden="true"><span class="pri__bar"></span><span class="pri__bar"></span><span class="pri__bar"></span></span>Ignore / spam</span></p>
+      <p class="kpi__num">8</p>
+    </div>
+  </section>
+
+  <section class="value-row" aria-label="Value in play">
+    <div class="kpi">
+      <p class="kpi__label">Value in play · P1</p>
+      <p class="kpi__num num">₹8,40,000</p>
+      <p class="kpi__sub">across 7 inquiries</p>
+    </div>
+    <div class="kpi">
+      <p class="kpi__label">Value in play · P2</p>
+      <p class="kpi__num num">₹4,10,000</p>
+      <p class="kpi__sub">across 9 inquiries</p>
+    </div>
+    <div class="kpi">
+      <p class="kpi__label">Skipped mail</p>
+      <p class="kpi__num">6</p>
+      <p class="kpi__sub">no brand keywords matched · <a href="/skipped">review list</a></p>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="per-h">
+    <div class="panel__head"><h2 class="panel__title" id="per-h">Deals per creator</h2><span class="panel__sub">all priorities, this month</span></div>
+    <div class="panel__body">
+      <ul>
+        <li class="hbar"><span class="hbar__name">Aanya Mehra</span><span class="hbar__track" aria-hidden="true"><span class="hbar__fill pct-100"></span></span><span class="hbar__num">9</span></li>
+        <li class="hbar"><span class="hbar__name">Rohan Iyer</span><span class="hbar__track" aria-hidden="true"><span class="hbar__fill pct-80"></span></span><span class="hbar__num">7</span></li>
+        <li class="hbar"><span class="hbar__name">Tara Dsouza</span><span class="hbar__track" aria-hidden="true"><span class="hbar__fill pct-65"></span></span><span class="hbar__num">6</span></li>
+        <li class="hbar"><span class="hbar__name">Kabir Shah</span><span class="hbar__track" aria-hidden="true"><span class="hbar__fill pct-55"></span></span><span class="hbar__num">5</span></li>
+        <li class="hbar"><span class="hbar__name">Meher Kaur</span><span class="hbar__track" aria-hidden="true"><span class="hbar__fill pct-35"></span></span><span class="hbar__num">3</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="log-h">
+    <div class="panel__head"><h2 class="panel__title" id="log-h">Decision log</h2><span class="panel__sub">every action a manager took, newest first</span></div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th scope="col">When</th><th scope="col">Creator</th><th scope="col">Brand</th><th scope="col">Action</th><th scope="col">Reply edited before sending</th></tr></thead>
+        <tbody>
+          <tr><td>19 Oct 2026, 15:12</td><td>Rohan Iyer</td><td>ProteinPlus Labs</td><td><span class="outcome outcome--approved">Approved</span></td><td>Yes</td></tr>
+          <tr><td>19 Oct 2026, 12:40</td><td>Kabir Shah</td><td>LuckyAce Rummy</td><td><span class="outcome outcome--declined">Declined</span></td><td>No</td></tr>
+          <tr><td>18 Oct 2026, 18:22</td><td>Tara Dsouza</td><td>Monsoon Trails</td><td><span class="outcome outcome--asked">Asked for info</span></td><td>No</td></tr>
+          <tr><td>18 Oct 2026, 11:03</td><td>Meher Kaur</td><td>Tadka Masala Co.</td><td><span class="outcome outcome--approved">Approved</span></td><td>Yes</td></tr>
+          <tr><td>17 Oct 2026, 16:47</td><td>Aanya Mehra</td><td>giftz-promo.top</td><td><span class="outcome outcome--spam">Marked spam</span></td><td class="muted">No reply</td></tr>
+          <tr><td>16 Oct 2026, 10:15</td><td>Aanya Mehra</td><td>Dewdrop Naturals</td><td><span class="outcome outcome--approved">Approved</span></td><td>No</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DM intake (AI off) · Deal Desk</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="sample-band" role="note"><span class="sample-band__tag">SAMPLE DATA</span> Every creator, brand, message and amount on this screen is synthetic.</div>
+<header class="topbar">
+  <div class="topbar__inner">
+    <a class="topbar__brand" href="queue.html">Deal Desk <span class="topbar__agency">Kalakaaar Talent</span></a>
+    <nav class="nav" aria-label="Main">
+      <a class="nav__link" href="queue.html">Queue</a>
+      <a class="nav__link" href="dm.html" aria-current="page">DM intake</a>
+      <a class="nav__link" href="creator.html">Creators</a>
+      <a class="nav__link" href="pipeline.html">Pipeline</a>
+      <a class="nav__link" href="config.html">Config</a>
+    </nav>
+    <form class="ai-toggle ai-toggle--off" method="post" action="/settings/ai">
+      <input type="hidden" name="ai" value="on">
+      <button class="ai-toggle__btn" type="submit" aria-pressed="false"><span class="ai-toggle__light" aria-hidden="true"></span>AI OFF <span class="ai-toggle__hint">rules only · click to turn on</span></button>
+    </form>
+  </div>
+</header>
+
+<main class="page stack">
+  <div class="page-head">
+    <div>
+      <h1>DM intake</h1>
+      <p class="page-head__meta">Instagram DMs don't reach the inbox scan. Paste the text or upload a screenshot to add one to the queue.</p>
+    </div>
+  </div>
+
+  <form class="panel" method="post" action="/dm/process" enctype="multipart/form-data">
+    <div class="panel__body stack">
+      <div class="form-row">
+        <label class="label" for="dm-creator">Whose DMs is this from?</label>
+        <select class="select" id="dm-creator" name="creator">
+          <option value="aanya" selected>Aanya Mehra — @aanyamehra</option>
+          <option value="rohan">Rohan Iyer — @rohan.lifts</option>
+          <option value="kabir">Kabir Shah — @kabirbuilds</option>
+          <option value="tara">Tara Dsouza — @tararoams</option>
+          <option value="meher">Meher Kaur — @meher.cooks</option>
+        </select>
+      </div>
+      <div class="dm-grid">
+        <div>
+          <label class="label" for="dm-sender">Sender handle</label>
+          <input class="input" id="dm-sender" name="sender" value="@" aria-describedby="dm-sender-help">
+          <p class="help" id="dm-sender-help">Optional. Used for the duplicate and suspicious-sender checks.</p>
+          <label class="label" for="dm-text">Paste the DM text</label>
+<textarea class="textarea paste" id="dm-text" name="text" rows="8">hi ma'am, humein aapke saath ek collab karna hai. budget 40k hai, ek reel aur do stories chahiye. diwali se pehle live karna hai.</textarea>
+          <p class="help">Hindi, English or Hinglish. Line breaks are kept.</p>
+        </div>
+        <div>
+          <p class="label" id="dm-shot-label">Or upload a screenshot</p>
+          <div class="drop is-disabled">
+            <svg class="i i--lg" width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 2l12 12" stroke="currentColor" stroke-width="1.5"/></svg>
+            <p class="drop__title">Screenshot upload is off</p>
+            <span class="btn btn--small is-disabled" aria-hidden="true">Choose file</span>
+            <input class="visually-hidden" id="dm-shot" name="screenshot" type="file" disabled aria-labelledby="dm-shot-label">
+            <p class="drop__off-note"><svg class="i" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 7v4.2M8 4.6v.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>Reading screenshots needs AI, which is off. Pasted text still works — rules pick up amounts, counts and dates; you fill in the rest.</span></p>
+          </div>
+        </div>
+      </div>
+      <div class="form-foot"><button class="btn btn--primary" type="submit">Process</button></div>
+    </div>
+  </form>
+
+</main>
+</body>
+</html>

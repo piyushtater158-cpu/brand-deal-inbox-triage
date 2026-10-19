@@ -1,47 +1,76 @@
 {% extends "base.html" %}
-{% block title %}Pipeline Summary — Brand Deal Inbox Triage{% endblock %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Pipeline{% endblock %}
 {% block content %}
-<h1>Pipeline Summary</h1>
-<p class="subtitle">Agency head view — read only.</p>
-
-<div class="summary-grid">
-  <div class="summary-tile"><span class="tile-value">{{ counts.P1 }}</span><span class="tile-label">P1</span></div>
-  <div class="summary-tile"><span class="tile-value">{{ counts.P2 }}</span><span class="tile-label">P2</span></div>
-  <div class="summary-tile"><span class="tile-value">{{ counts.P3 }}</span><span class="tile-label">P3</span></div>
-  <div class="summary-tile"><span class="tile-value">{{ counts.Ignore }}</span><span class="tile-label">Ignore / spam</span></div>
+<div class="page-head">
+  <div>
+    <h1>Pipeline</h1>
+    <p class="page-head__meta">{{ total }} inquiries across {{ creators|length }} creators · read-only{% if last_scan %} · as of {{ last_scan|datetime_long }}{% endif %}</p>
+  </div>
 </div>
 
-<div class="summary-grid">
-  <div class="summary-tile"><span class="tile-value">{{ value_p1|inr }}</span><span class="tile-label">Value in play, P1</span></div>
-  <div class="summary-tile"><span class="tile-value">{{ value_p2|inr }}</span><span class="tile-label">Value in play, P2</span></div>
-  <div class="summary-tile headline"><span class="tile-value">{{ conflicts_caught }}</span><span class="tile-label">Conflicts caught</span></div>
-  <div class="summary-tile"><span class="tile-value">{{ skipped_count }}</span><span class="tile-label">Skipped mail</span></div>
-</div>
+<section class="kpis" aria-label="Counts">
+  <div class="kpi kpi--headline">
+    <p class="kpi__label">{{ ui.icon('stop', lg=true) }}Conflicts caught</p>
+    <p class="kpi__num">{{ conflicts|length }}</p>
+    <p class="kpi__sub">Offers that would have broken a signed exclusivity.{% if conflicts %} Latest: {{ conflicts[0] }}.{% endif %}</p>
+  </div>
+  {% for p in priorities %}
+  <div class="kpi">
+    <p class="kpi__label">{{ ui.pri(p, 'Ignore / spam' if p == 'Ignore' else p) }}</p>
+    <p class="kpi__num">{{ counts[p] }}</p>
+  </div>
+  {% endfor %}
+</section>
 
-<h2>Deals per creator</h2>
-<table class="history-table">
-  <thead><tr><th>Creator</th><th>Inquiries</th></tr></thead>
-  <tbody>
-    {% for creator_id, count in deals_per_creator.items() %}
-      <tr><td><a href="/creator/{{ creator_id }}">{{ creators[creator_id].name }}</a></td><td>{{ count }}</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+<section class="value-row" aria-label="Value in play">
+  <div class="kpi">
+    <p class="kpi__label">Value in play · P1</p>
+    <p class="kpi__num num">{{ value_p1|inr }}</p>
+    <p class="kpi__sub">across {{ counts.P1 }} inquir{{ 'y' if counts.P1 == 1 else 'ies' }}</p>
+  </div>
+  <div class="kpi">
+    <p class="kpi__label">Value in play · P2</p>
+    <p class="kpi__num num">{{ value_p2|inr }}</p>
+    <p class="kpi__sub">across {{ counts.P2 }} inquir{{ 'y' if counts.P2 == 1 else 'ies' }}</p>
+  </div>
+  <div class="kpi">
+    <p class="kpi__label">Skipped mail</p>
+    <p class="kpi__num">{{ skipped_count }}</p>
+    <p class="kpi__sub">no brand keywords matched · <a href="/skipped">review list</a></p>
+  </div>
+</section>
 
-<h2>Decision log</h2>
-<table class="history-table">
-  <thead><tr><th>Timestamp</th><th>Inquiry</th><th>Action</th><th>Edited?</th></tr></thead>
-  <tbody>
-    {% for d in decisions %}
-      <tr>
-        <td>{{ d['timestamp'][:19]|replace('T', ' ') }}</td>
-        <td><a href="/inquiry/{{ d['inquiry_id'] }}">{{ d['inquiry_id'] }}</a></td>
-        <td>{{ d['action']|replace('_', ' ')|title }}</td>
-        <td>{{ 'yes' if d['edited_reply'] else 'no' }}</td>
-      </tr>
-    {% else %}
-      <tr><td colspan="4">No decisions logged yet.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+<section class="panel" aria-labelledby="per-h">
+  <div class="panel__head"><h2 class="panel__title" id="per-h">Deals per creator</h2><span class="panel__sub">all priorities, last scan</span></div>
+  <div class="panel__body">
+    <ul>
+      {% for d in per_creator %}
+      <li class="hbar"><a class="hbar__name" href="/creator/{{ d.creator.id }}">{{ d.creator.name }}</a><span class="hbar__track" aria-hidden="true"><span class="hbar__fill pct-{{ d.fill }}"></span></span><span class="hbar__num">{{ d.count }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="panel" aria-labelledby="log-h">
+  <div class="panel__head"><h2 class="panel__title" id="log-h">Decision log</h2><span class="panel__sub">every action a manager took, newest first</span></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th scope="col">When</th><th scope="col">Creator</th><th scope="col">Brand</th><th scope="col">Action</th><th scope="col">Reply edited before sending</th></tr></thead>
+      <tbody>
+        {% for d in decisions %}
+        <tr>
+          <td>{{ d.timestamp|datetime_long }}</td>
+          <td>{{ d.creator }}</td>
+          <td>{% if d.exists %}<a href="/inquiry/{{ d.inquiry_id }}">{{ d.brand }}</a>{% else %}{{ d.brand }}{% endif %}</td>
+          <td><span class="outcome outcome--{{ d.outcome[1] }}">{{ d.outcome[0] }}</span></td>
+          <td{{ ' class="muted"'|safe if d.edited is none }}>{{ 'No reply' if d.edited is none else ('Yes' if d.edited else 'No') }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="muted">No decisions logged yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
 {% endblock %}

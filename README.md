@@ -22,6 +22,16 @@ writing, screenshot OCR) — never the source of truth. The AI toggle in the hea
 switches everything to deterministic fallbacks, and the app stays fully usable either
 way.
 
+## The interface
+
+The screens follow the Claude Design handoff in `design/kalakaaar-triage/` ("Deal
+Desk"): one shared stylesheet, system fonts, no external requests, verdicts carried by
+colour plus icon plus words, and rank shown by fill weight. `design/NOTES.md` has the
+type scale, spacing scale and colour roles. The engine doesn't format anything for
+display; `app/view.py` turns its output into what the screens show (flag tiers and
+their one-line reasons, the budget-vs-quote bar, the quote argument, the score behind
+a conflict cap) without changing a score, flag or action.
+
 ## Running it
 
 **Docker (recommended):**
@@ -77,9 +87,10 @@ drop this key (the engine falls back to `date.today()` when it's unset).
 ## Verifying it
 
 ```bash
-pytest                           # 49 tests: quote math, extraction regex, AI-off
-                                  # fallbacks, manager edits + live re-score, and
-                                  # the full scenario fixture
+pytest                           # 67 tests: quote math, extraction regex, AI-off
+                                  # fallbacks, manager edits + live re-score, DM
+                                  # preview, config/creator saves, and the full
+                                  # scenario fixture
 python scripts/check_expected.py # standalone AI-off acceptance check, no pytest
                                   # needed — exits 0 on a full match
 ```
@@ -87,12 +98,14 @@ python scripts/check_expected.py # standalone AI-off acceptance check, no pytest
 Against a running instance (the Docker container, or a deployed URL):
 
 ```bash
-python scripts/smoke_test.py [base_url]    # 73 HTTP checks: every screen, filters,
+python scripts/smoke_test.py [base_url]    # 84 HTTP checks: every screen, filters,
                                            # edits, decisions, DM intake, config,
                                            # AI toggle, 404s, concurrent writes, and
                                            # the expected-results match
-python scripts/browser_test.py [base_url]  # real Edge/Chrome: the HTMX swaps, with
-                                           # every off-host request blocked
+python scripts/browser_test.py [base_url]  # 15 checks in real Edge/Chrome: HTMX swaps,
+                                           # copy-to-clipboard, DM preview, with every
+                                           # off-host request blocked; screenshots of
+                                           # each screen land in scripts/screens/
 ```
 
 `browser_test.py` needs `pip install playwright` (a dev-only dependency; it drives the
@@ -101,7 +114,8 @@ state, so point them at a demo instance, not one you're mid-review on.
 
 The container has been verified with no internet access at all (an internal Docker
 network), under Render free-tier limits (512 MB, 0.1 CPU) on an injected `PORT`:
-all 73 smoke checks pass, ready in about 7 seconds, using about 50 MB of memory.
+all 84 smoke checks pass, ready in 7–13 seconds on the throttled CPU, using about
+60 MB of memory.
 
 `scripts/check_expected.py` is the brief's "automated test script passes with AI off"
 acceptance test. It re-runs the real pipeline against `seed/demo_inbox.json` and

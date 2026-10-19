@@ -1,0 +1,7 @@
+{% import "partials/ui.html" as ui %}
+{% include "partials/assessment.html" %}
+{% if refresh_fields %}
+{% for f in fields %}{{ ui.field_row(inquiry['id'], f, oob=true) }}{% endfor %}
+{% elif oob_field %}
+{{ ui.field_row(inquiry['id'], oob_field, oob=true, error=oob_error) }}
+{% endif %}

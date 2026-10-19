@@ -1,38 +1,51 @@
-<div id="queue-list" class="queue-list">
-  {% if rows %}
-    {% for r in rows %}
-      {% set a = r.assessment %}
-      {% set e = r.extraction %}
-      {% set inq = r.inquiry %}
-      <a href="/inquiry/{{ inq['id'] }}" class="queue-card priority-{{ a.priority|lower }}">
-        <div class="queue-card-top">
-          <span class="creator-name">{{ inq['creator_name'] }} <span class="handle">{{ inq['creator_handle'] }}</span></span>
-          <span class="priority-badge priority-{{ a.priority|lower }}">{{ a.priority }}</span>
-        </div>
-        <div class="queue-card-brand">{{ e.brand or '(brand not identified)' }}</div>
-        <div class="queue-card-budget">
-          {% if a.type == 'barter' %}
-            Barter · product value {{ (e.product_value)|inr }} vs {{ (a.quote.total if a.quote else None)|inr }} quote
-          {% elif e.budget_amount %}
-            {{ e.budget_amount|inr }} offered vs {{ (a.quote.total if a.quote else None)|inr }} quote
-          {% else %}
-            Budget not stated
-          {% endif %}
-        </div>
-        <div class="deliverables">
-          {% for d in e.deliverables %}<span class="deliverable-pill">{{ d.count }} × {{ d.type|replace('_', ' ')|title }}</span>{% endfor %}
-        </div>
-        <div class="queue-card-score">
-          <span class="type-badge type-{{ a.type }}">{{ a.type|replace('_', ' ')|title }}</span>
-          <span class="score">{{ a.final_score|round(0, 'floor')|int }}</span>
-          {% for f in a.flags %}<span class="flag-chip flag-{{ f }}">{{ f|replace('_', ' ')|title }}</span>{% endfor %}
-        </div>
-        <div class="queue-card-reason">{{ a.reason }}</div>
-      </a>
-    {% endfor %}
-  {% else %}
-    <div class="empty-state">
-      No inquiries match these filters. <a href="/">Clear filters</a>, or click "Scan inboxes" if you haven't yet.
+{% import "partials/ui.html" as ui %}
+<section id="queue-list" aria-label="Inquiries">
+{% if rows %}
+  <ol class="queue">
+  {% for r in rows %}
+    {% set a = r.assessment %}{% set e = r.extraction %}{% set inq = r.inquiry %}
+    {% set stopped = r.flags and r.flags[0].tier == 'stop' %}
+    <li class="qcard{{ ' qcard--ignore' if a.priority == 'Ignore' }}{{ ' qcard--stopped' if stopped }}">
+      {{ ui.score(a) }}
+      <div class="qcard__who">
+        <h2 class="qcard__brand"><a class="qcard__link" href="/inquiry/{{ inq['id'] }}">{{ e.brand or inq['sender_domain'] or 'Brand not identified' }}</a> {{ ui.type_badge(a.type) }}</h2>
+        <p class="qcard__creator">for <b>{{ inq['creator_name'] }}</b> <span class="handle">{{ inq['creator_handle'] }}</span>{% if inq['source'] == 'dm' %} · via DM{% endif %}</p>
+        <p class="qcard__reason">{{ a.reason }}</p>
+      </div>
+      {{ ui.bvq(r.bvq) }}
+      <div class="qcard__meta">
+        {{ ui.dlvs(e.deliverables) }}
+        {{ ui.flags(r.flags) }}
+      </div>
+      {{ ui.icon('go', lg=true, cls='qcard__go') }}
+    </li>
+  {% endfor %}
+  </ol>
+{% elif has_data %}
+  <div class="empty">
+    <p class="empty__title">No inquiries match these filters</p>
+    {% if active_filters %}
+    <ul class="active-filters" aria-label="Active filters">{% for label in active_filters %}<li class="active-filter">{{ label }}</li>{% endfor %}</ul>
+    {% endif %}
+    {% if filter_creator %}
+    <p class="empty__body">{{ filter_creator.name }} has {{ filter_creator_count }} inquir{{ 'y' if filter_creator_count == 1 else 'ies' }} in the queue, and none match the other filters. The other {{ total - filter_creator_count }} belong to other creators.</p>
+    {% else %}
+    <p class="empty__body">None of the {{ total }} inquiries in the queue match. Loosen a filter or clear them all.</p>
+    {% endif %}
+    <div class="empty__actions">
+      {% if filter_creator and active_filters|length > 1 %}<a class="btn" href="/?creator={{ filter_creator.id }}">Show all of {{ filter_creator.name.split()[0] }}'s</a>{% endif %}
+      <a class="btn btn--quiet" href="/">Clear all filters</a>
     </div>
-  {% endif %}
-</div>
+  </div>
+{% else %}
+  <div class="empty">
+    <p class="empty__title">The queue is empty until the first scan</p>
+    <p class="empty__body">A scan reads the {{ creators|length }} connected creator inboxes, keeps messages that match a brand keyword, and scores each one against that creator's rate card and rules. Nothing is sent from here.</p>
+    <div class="empty__actions">
+      <form method="post" action="/scan"><button class="btn btn--primary" type="submit">Scan inboxes</button></form>
+      <a class="btn" href="/dm">Paste an Instagram DM</a>
+    </div>
+    <p class="help">Reference date for scoring: {{ reference_date|date_long }} · change it in <a href="/config">Config</a></p>
+  </div>
+{% endif %}
+</section>

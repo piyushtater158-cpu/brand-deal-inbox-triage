@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Creator page variants · Deal Desk</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="sample-band" role="note"><span class="sample-band__tag">SAMPLE DATA</span> Every creator, brand, message and amount on this screen is synthetic.</div>
+<header class="topbar">
+  <div class="topbar__inner">
+    <a class="topbar__brand" href="queue.html">Deal Desk <span class="topbar__agency">Kalakaaar Talent</span></a>
+    <nav class="nav" aria-label="Main">
+      <a class="nav__link" href="queue.html">Queue</a>
+      <a class="nav__link" href="dm.html">DM intake</a>
+      <a class="nav__link" href="creator.html" aria-current="page">Creators</a>
+      <a class="nav__link" href="pipeline.html">Pipeline</a>
+      <a class="nav__link" href="config.html">Config</a>
+    </nav>
+    <form class="ai-toggle ai-toggle--on" method="post" action="/settings/ai">
+      <input type="hidden" name="ai" value="off">
+      <button class="ai-toggle__btn" type="submit" aria-pressed="true"><span class="ai-toggle__light" aria-hidden="true"></span>AI ON <span class="ai-toggle__hint">click to turn off</span></button>
+    </form>
+  </div>
+</header>
+
+<main class="page stack">
+  <p class="state-sheet__caption"><strong>State sheet — creator page components.</strong> Each block below drops into the matching panel on <a href="creator.html">creator.html</a>. Left: the state Aanya is in today. Right: the variant.</p>
+
+  <section class="stack" aria-labelledby="v1">
+    <h2 id="v1">Partners — active exclusive vs expired</h2>
+    <div class="state-sheet__pair">
+      <div>
+        <p class="state-sheet__label">Active</p>
+        <div class="excl">
+          <div>
+            <p class="excl__name">Santoor</p>
+            <p class="excl__cat">Personal care · <span class="excl__tag"><svg class="i" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>EXCLUSIVE</span></p>
+          </div>
+          <p class="excl__days"><span class="excl__days-num num">163</span><span class="excl__days-label">days remaining</span></p>
+          <p class="excl__until">Ends 31 Mar 2027 · blocks every Personal care inquiry going live before then</p>
+        </div>
+      </div>
+      <div>
+        <p class="state-sheet__label">Expired</p>
+        <div class="excl excl--expired">
+          <div>
+            <p class="excl__name">Plum Goodness</p>
+            <p class="excl__cat">Skincare · <span class="excl__tag">Exclusive — ended</span></p>
+          </div>
+          <p class="excl__days"><span class="excl__days-num">Expired</span><span class="excl__days-label">42 days ago</span></p>
+          <p class="excl__until">Ended 7 Sep 2026 · no longer blocks Skincare inquiries · kept for history</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="stack" aria-labelledby="v2">
+    <h2 id="v2">Blackout dates — none vs populated</h2>
+    <div class="state-sheet__pair">
+      <div class="panel panel__body blackout">
+        <p class="state-sheet__label">None (Aanya today)</p>
+        <p class="blackout-none">None set. Inquiries are not checked against any dates.</p>
+        <a class="btn btn--small" href="#">Add blackout dates</a>
+      </div>
+      <div class="panel panel__body blackout">
+        <p class="state-sheet__label">Populated</p>
+        <div class="blackout__item">
+          <svg class="i i--lg" width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 6h13M5 1v3M11 1v3M5.5 9l5 4M10.5 9l-5 4" stroke="currentColor" stroke-width="1.5"/></svg>
+          <div><p class="blackout__dates">10–20 Nov 2026</p><p class="blackout__why">Travel</p></div>
+          <form method="post" action="/creator/aanya/blackout/remove"><button class="btn btn--small" type="submit" name="id" value="1">Remove</button></form>
+        </div>
+        <p class="help">Any inquiry going live in this window gets a Blackout clash flag.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="stack" aria-labelledby="v3">
+    <h2 id="v3">Capacity meter — open vs full</h2>
+    <div class="state-sheet__pair">
+      <div class="panel panel__body">
+        <div class="cap cap--open">
+          <div class="cap__line"><span><span class="cap__num num">2 of 4</span> booked this month</span><span class="cap__state">2 open</span></div>
+          <div class="cap__slots" role="img" aria-label="2 of 4 slots booked"><span class="cap__slot is-booked"></span><span class="cap__slot is-booked"></span><span class="cap__slot"></span><span class="cap__slot"></span></div>
+        </div>
+      </div>
+      <div class="panel panel__body">
+        <div class="cap cap--full">
+          <div class="cap__line"><span><span class="cap__num num">4 of 4</span> booked this month</span><span class="cap__state">Full</span></div>
+          <div class="cap__slots" role="img" aria-label="4 of 4 slots booked, full"><span class="cap__slot is-booked"></span><span class="cap__slot is-booked"></span><span class="cap__slot is-booked"></span><span class="cap__slot is-booked"></span></div>
+          <p class="help">New inquiries for October get a Capacity full flag.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+</body>
+</html>

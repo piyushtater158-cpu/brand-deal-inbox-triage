@@ -1,35 +1,86 @@
 {% extends "base.html" %}
-{% block title %}DM Intake — Brand Deal Inbox Triage{% endblock %}
+{% import "partials/ui.html" as ui %}
+{% block title %}DM intake{% endblock %}
 {% block content %}
-<h1>Instagram DM Intake</h1>
-<form method="post" action="/dm/process" enctype="multipart/form-data" class="dm-intake-form">
-  <label>Creator
-    <select name="creator_id" required>
-      {% for c in creators %}<option value="{{ c.id }}">{{ c.name }} ({{ c.ig_handle }})</option>{% endfor %}
-    </select>
-  </label>
+<div class="page-head">
+  <div>
+    <h1>DM intake</h1>
+    <p class="page-head__meta">Instagram DMs don't reach the inbox scan. Paste the text{{ ' or upload a screenshot' if ai_on }} to add one to the queue.</p>
+  </div>
+</div>
 
-  <label>Paste DM text
-    <textarea name="dm_text" rows="6" placeholder="hi ma'am, humein aapke saath ek collab karna hai..."></textarea>
-  </label>
+{% if error %}<p class="alert" role="alert">{{ ui.icon('x') }}<span>{{ error }}</span></p>{% endif %}
 
-  {% if ai_on %}
-    <label>Or upload a screenshot
-      <input type="file" name="screenshot" accept="image/*">
-    </label>
-  {% else %}
-    <p class="ai-off-note">
-      Screenshot reading needs AI — currently off. Paste the DM text above instead; that
-      still works end to end.
-    </p>
-  {% endif %}
-
-  <button type="submit" class="btn btn-primary">Process</button>
+<form class="panel dm-intake-form" method="post" action="/dm/process" enctype="multipart/form-data">
+  <div class="panel__body stack">
+    <div class="dm-grid">
+      <div>
+      <label class="label" for="dm-creator">Whose DMs is this from?</label>
+      <select class="select" id="dm-creator" name="creator_id" required>
+        {% for c in creators %}<option value="{{ c.id }}"{{ ' selected' if c.id == form.creator_id }}>{{ c.name }} — {{ c.ig_handle }}</option>{% endfor %}
+      </select>
+      </div>
+    </div>
+    <div class="dm-grid">
+      <div>
+        <label class="label" for="dm-sender">Sender handle</label>
+        <input class="input" id="dm-sender" name="sender" value="{{ form.sender }}" placeholder="@brand.handle" aria-describedby="dm-sender-help">
+        <p class="help" id="dm-sender-help">Optional. Shown as the sender on the inquiry.</p>
+        <label class="label" for="dm-text">Paste the DM text</label>
+<textarea class="textarea paste" id="dm-text" name="dm_text" rows="8" placeholder="hi ma'am, humein aapke saath ek collab karna hai...">{{ form.dm_text }}</textarea>
+        <p class="help">Hindi, English or Hinglish. Line breaks are kept.</p>
+      </div>
+      <div>
+        <p class="label" id="dm-shot-label">Or upload a screenshot</p>
+        {% if ai_on %}
+        <div class="drop">
+          {{ ui.icon('image', lg=true) }}
+          <p class="drop__title">PNG or JPG of the DM thread</p>
+          <label class="btn btn--small" for="dm-shot">Choose file</label>
+          <input class="visually-hidden" id="dm-shot" name="screenshot" type="file" accept="image/png,image/jpeg" aria-labelledby="dm-shot-label">
+          <p class="help">Read by AI. Check the extracted fields before adding.</p>
+        </div>
+        {% else %}
+        <div class="drop is-disabled ai-off-note">
+          {{ ui.icon('image-off', lg=true) }}
+          <p class="drop__title">Screenshot upload is off</p>
+          <span class="btn btn--small is-disabled" aria-hidden="true">Choose file</span>
+          <p class="drop__off-note">{{ ui.icon('notice') }}<span>Reading screenshots needs AI, which is off. Pasted text still works — rules pick up amounts, counts and dates; you fill in the rest.</span></p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="form-foot"><button class="btn btn--primary" type="submit">Process</button></div>
+  </div>
 </form>
 
 {% if preview %}
-  <h2>Extracted preview</h2>
-  <p>Brand: {{ preview.extraction.brand or '(not identified)' }}</p>
-  <p>Type: {{ preview.assessment.type }} — Priority: {{ preview.assessment.priority }}</p>
+<section class="panel" aria-labelledby="prev-h">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title" id="prev-h">Check before adding to the queue</h2>
+      <p class="panel__sub">Extracted from the {{ 'screenshot' if preview.from_screenshot else 'pasted text' }} · not in the queue yet · quote and score are worked out when you add it</p>
+    </div>
+    {{ ui.flags(preview.flags) }}
+  </div>
+  <form class="fields" method="post" action="/dm/commit">
+    <input type="hidden" name="creator_id" value="{{ form.creator_id }}">
+    <input type="hidden" name="sender" value="{{ form.sender }}">
+    <textarea name="dm_text" hidden>{{ preview.text }}</textarea>
+    {% for f in preview.fields %}
+    <div class="field{{ ' has-error' if preview.errors.get(f.name) }}">
+      <label class="field__label" for="p-{{ f.name }}">{{ f.label }}</label>
+      <input class="field__input{{ ' num' if f.num }}" id="p-{{ f.name }}" name="f_{{ f.name }}" type="{{ 'text' if f.kind == 'select' else f.kind }}" value="{{ f.value }}"{% if f.placeholder %} placeholder="{{ f.placeholder }}"{% endif %}>
+      <input type="hidden" name="o_{{ f.name }}" value="{{ f.original }}">
+      <span class="prov prov--{{ f.prov }}">{{ f.prov_label }}</span><span></span>
+      {% if preview.errors.get(f.name) %}<p class="field__note" role="alert">{{ preview.errors[f.name] }}</p>{% endif %}
+    </div>
+    {% endfor %}
+    <div class="panel__body form-foot">
+      <a class="btn" href="/dm">Discard</a>
+      <button class="btn btn--primary" type="submit">Add to queue</button>
+    </div>
+  </form>
+</section>
 {% endif %}
 {% endblock %}

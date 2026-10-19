@@ -1,56 +1,73 @@
 {% extends "base.html" %}
-{% block title %}Triage Queue — Brand Deal Inbox Triage{% endblock %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Triage queue{% endblock %}
 {% block content %}
-<div class="queue-header">
-  <h1>Triage Queue</h1>
-  <form method="post" action="/scan">
-    <button type="submit" class="btn btn-primary">Scan inboxes</button>
-  </form>
-</div>
-
-<div id="skipped-notice" class="skipped-notice">
-  {% if skipped_count %}
-    {{ skipped_count }} message{{ 's' if skipped_count != 1 else '' }} skipped — no brand keywords matched.
-    <details>
-      <summary>View list</summary>
-      <ul>
-        {% for s in skipped %}
-          <li>{{ s['subject'] or '(no subject — DM)' }} — {{ s['received_at'][:10] }} — {{ s['reason'] }}</li>
-        {% endfor %}
-      </ul>
-    </details>
-  {% else %}
-    No mail scanned yet, or nothing was skipped.
+<div class="page-head">
+  <div>
+    <h1>Triage queue</h1>
+    <p class="page-head__meta">
+      {% if has_data %}{{ total }} inquir{{ 'y' if total == 1 else 'ies' }} · {{ creator_count }} creator{{ 's' if creator_count != 1 }}{% if last_scan %} · last scan {{ last_scan|datetime_long }}{% endif %}
+      {% else %}Not scanned yet · {{ creators|length }} creator inboxes connected{% endif %}
+    </p>
+  </div>
+  {% if has_data %}
+  <div class="page-head__actions">
+    <form method="post" action="/scan"><button class="btn btn--primary" type="submit">{{ ui.icon('scan') }} Scan inboxes</button></form>
+  </div>
   {% endif %}
 </div>
 
-<form class="filter-bar" hx-get="/partials/queue-list" hx-target="#queue-list" hx-swap="outerHTML" hx-trigger="change">
-  <select name="creator">
-    <option value="">All creators</option>
-    {% for c in creators %}
-      <option value="{{ c.id }}" {{ 'selected' if filters.creator == c.id else '' }}>{{ c.name }}</option>
-    {% endfor %}
-  </select>
-  <select name="type">
-    <option value="">All types</option>
-    {% for t in ["paid", "barter", "hybrid", "spam", "not_a_deal"] %}
-      <option value="{{ t }}" {{ 'selected' if filters.type == t else '' }}>{{ t }}</option>
-    {% endfor %}
-  </select>
-  <select name="flag">
-    <option value="">All flags</option>
-    {% for f in ["conflict", "no_go", "lowball", "missing_info", "duplicate", "urgent", "capacity_full", "blackout_clash", "usage_overreach", "risky_payment_terms", "suspicious_sender"] %}
-      <option value="{{ f }}" {{ 'selected' if filters.flag == f else '' }}>{{ f }}</option>
-    {% endfor %}
-  </select>
-  <select name="priority">
-    <option value="">All priorities</option>
-    {% for p in ["P1", "P2", "P3", "Ignore"] %}
-      <option value="{{ p }}" {{ 'selected' if filters.priority == p else '' }}>{{ p }}</option>
-    {% endfor %}
-  </select>
-  <noscript><button type="submit" class="btn">Filter</button></noscript>
+{% if has_data %}
+<div id="skipped-notice" class="skipped">
+  {{ ui.icon('notice') }}
+  {% if skipped_count %}
+  <span><b>{{ skipped_count }} message{{ 's' if skipped_count != 1 }} skipped</b> — no brand keywords matched.</span>
+  <a href="/skipped">View list</a>
+  {% else %}
+  <span>No messages skipped — every scanned message matched a brand keyword.</span>
+  {% endif %}
+</div>
+
+<form class="filters panel" method="get" action="/" hx-get="/" hx-target="#queue-list" hx-select="#queue-list" hx-swap="outerHTML" hx-trigger="change" hx-push-url="true">
+  <div>
+    <label class="label" for="f-creator">Creator</label>
+    <select class="select" id="f-creator" name="creator">
+      <option value="">All creators</option>
+      {% for c in creators %}<option value="{{ c.id }}"{{ ' selected' if filters.creator == c.id }}>{{ c.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="label" for="f-type">Type</label>
+    <select class="select" id="f-type" name="type">
+      <option value="">All types</option>
+      {% for key, label in type_labels.items() %}<option value="{{ key }}"{{ ' selected' if filters.type == key }}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="label" for="f-flag">Flag</label>
+    <select class="select" id="f-flag" name="flag">
+      <option value="">Any flag</option>
+      {% for tier, tier_label in flag_tiers %}
+      <optgroup label="{{ tier_label }}">
+        {% for key, meta in flag_meta.items() if meta[1] == tier %}<option value="{{ key }}"{{ ' selected' if filters.flag == key }}>{{ meta[0] }}</option>{% endfor %}
+      </optgroup>
+      {% endfor %}
+      <option value="none"{{ ' selected' if filters.flag == 'none' }}>No flags</option>
+    </select>
+  </div>
+  <div>
+    <label class="label" for="f-pri">Priority</label>
+    <select class="select" id="f-pri" name="priority">
+      <option value="">All priorities</option>
+      {% for p in priorities %}<option value="{{ p }}"{{ ' selected' if filters.priority == p }}>{{ p }}</option>{% endfor %}
+    </select>
+  </div>
+  <button class="btn" type="submit">Apply</button>
+  <a class="btn btn--quiet" href="/">Clear</a>
 </form>
+{% else %}
+<p id="skipped-notice" class="skipped visually-hidden"></p>
+{% endif %}
 
 {% include "partials/queue_list.html" %}
 {% endblock %}

@@ -1,0 +1,126 @@
+{# Shared components from the design handoff (design/kalakaaar-triage/NOTES.md). #}
+
+{% macro icon(name, lg=false, cls='') -%}
+<svg class="{{ cls ~ ' ' if cls }}i{{ ' i--lg' if lg }}" width="{{ 18 if lg else 14 }}" height="{{ 18 if lg else 14 }}" viewBox="0 0 16 16" aria-hidden="true">
+{%- if name == 'check' -%}<path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+{%- elif name == 'x' -%}<path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+{%- elif name == 'stop' -%}<path d="M5.2 1.5h5.6l3.7 3.7v5.6l-3.7 3.7H5.2l-3.7-3.7V5.2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M5 8h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+{%- elif name == 'risk' -%}<path d="M8 1.5 15 14H1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6v4M8 11.6v.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+{%- elif name == 'notice' -%}<circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 7v4.2M8 4.6v.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+{%- elif name == 'go' -%}<path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+{%- elif name == 'scan' -%}<path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1M13.5 2v3.5H10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+{%- elif name == 'mail' -%}<rect x="1.5" y="3" width="13" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 4l6 5 6-5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+{%- elif name == 'dm' -%}<path d="M2 3h12v8H6l-3 3v-3H2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+{%- elif name == 'lock' -%}<rect x="3" y="7" width="10" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/>
+{%- elif name == 'blackout' -%}<rect x="1.5" y="2.5" width="13" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 6h13M5 1v3M11 1v3M5.5 9l5 4M10.5 9l-5 4" stroke="currentColor" stroke-width="1.5"/>
+{%- elif name == 'image' -%}<rect x="1.5" y="2.5" width="13" height="11" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="5.5" cy="6" r="1.3" fill="currentColor"/><path d="M2 12l4-4 3 3 2-2 3 3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+{%- elif name == 'image-off' -%}<rect x="1.5" y="2.5" width="13" height="11" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 2l12 12" stroke="currentColor" stroke-width="1.5"/>
+{%- elif name == 'copy' -%}<rect x="5" y="5" width="9" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 3V2H2v9h1" fill="none" stroke="currentColor" stroke-width="1.6"/>
+{%- endif -%}
+</svg>
+{%- endmacro %}
+
+{% macro score(a, lg=false) -%}
+<div class="score score--{{ a.priority|lower }}{{ ' score--lg' if lg }}" aria-label="Score {{ a.final_score|int }}, priority {{ a.priority }}"><span class="score__num">{{ a.final_score|int }}</span><span class="score__pri">{{ a.priority }}</span></div>
+{%- endmacro %}
+
+{% macro pri(priority, label=none) -%}
+{%- set on = {'P1': 3, 'P2': 2, 'P3': 1, 'Ignore': 0}[priority] -%}
+<span class="pri pri--{{ priority|lower }}"><span class="pri__bars" aria-hidden="true">{% for i in range(3) %}<span class="pri__bar{{ ' is-on' if i < on }}"></span>{% endfor %}</span>{{ label or priority }}</span>
+{%- endmacro %}
+
+{% macro type_badge(t) -%}
+<span class="type type--{{ type_class[t] }}">{{ type_labels[t] }}</span>
+{%- endmacro %}
+
+{% macro flag_chip(f) -%}
+<span class="flag flag--{{ f.tier }}">{{ icon(f.tier) }}{{ f.label }}</span>
+{%- endmacro %}
+
+{% macro flags(fl) -%}
+{% if fl %}
+<ul class="flags" aria-label="Flags">{% for f in fl %}<li class="flag flag--{{ f.tier }}">{{ icon(f.tier) }}{{ f.label }}</li>{% endfor %}</ul>
+{% else %}
+<p class="flags-none">{{ icon('check') }}No flags</p>
+{% endif %}
+{%- endmacro %}
+
+{% macro bvq(b, lg=false, legend=none) -%}
+<div class="bvq bvq--{{ b.state }}{{ ' bvq--over' if b.over }}{{ ' bvq--lg' if lg }}">
+  {% if b.offer is not none %}
+  <p class="bvq__figures"><span class="bvq__offer num">{{ b.offer|inr }}</span><span class="bvq__vs">{{ b.vs }}</span><span class="bvq__quote num">{{ (b.quote|inr ~ ' quote') if b.quote else 'no quote' }}</span></p>
+  {% if b.quote %}<div class="bvq__track {{ b.min_class }}" aria-hidden="true"><span class="bvq__fill pct-{{ b.fill }}"></span></div>{% endif %}
+  {% endif %}
+  <p class="bvq__verdict">{% if b.state == 'ok' %}{{ icon('check') }}{% elif b.state == 'under' %}{{ icon('risk') }}{% elif b.state == 'short' %}{{ icon('x') }}{% endif %}{{ b.verdict }}{% if b.sub %} <span class="bvq__verdict-sub">· {{ b.sub }}</span>{% endif %}</p>
+  {% if legend and b.quote %}<p class="bvq__legend">{{ legend }}</p>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro dlvs(deliverables) -%}
+{% if deliverables %}
+<ul class="dlvs" aria-label="Deliverables">{% for d in deliverables %}<li class="dlv"><span class="dlv__n">{{ d.count }}</span><span class="dlv__kind">× {{ deliverable_labels.get(d.type, d.type) }}</span></li>{% endfor %}</ul>
+{% else %}
+<p class="flags-none">Deliverables not stated</p>
+{% endif %}
+{%- endmacro %}
+
+{# One editable field = one form, so HTMX posts only this field's value. #}
+{% macro field_row(inquiry_id, f, oob=false, error=none) -%}
+<form class="field{{ ' has-error' if error }}" id="field-{{ f.name }}" method="post" action="/inquiry/{{ inquiry_id }}/edit"
+      hx-post="/inquiry/{{ inquiry_id }}/edit" hx-target="#assessment" hx-swap="outerHTML" hx-trigger="change, submit"{{ ' hx-swap-oob="true"'|safe if oob }}>
+  <input type="hidden" name="field" value="{{ f.name }}">
+  <label class="field__label" for="f_{{ f.name }}">{{ f.label }}</label>
+  {% if f.kind == 'select' %}
+  <select class="field__input" id="f_{{ f.name }}" name="value">
+    {% for v, l in f.options %}<option value="{{ v }}"{{ ' selected' if v == f.value }}>{{ l }}</option>{% endfor %}
+  </select>
+  {% else %}
+  <input class="field__input{{ ' num' if f.num }}" id="f_{{ f.name }}" name="value" type="{{ f.kind }}" value="{{ f.value }}"{% if f.placeholder %} placeholder="{{ f.placeholder }}"{% endif %}>
+  {% endif %}
+  <span class="prov prov--{{ f.prov }}">{{ f.prov_label }}</span>
+  <button class="field__save btn btn--small" type="submit">Save</button>
+  {% if error %}<p class="field__note" role="alert">{{ error }}</p>{% elif f.note %}<p class="field__note">{{ f.note }}</p>{% endif %}
+</form>
+{%- endmacro %}
+
+{% macro excl(p) -%}
+{% if p.state == 'expired' %}
+<div class="excl excl--expired">
+  <div>
+    <p class="excl__name">{{ p.brand }}</p>
+    <p class="excl__cat">{{ p.category }} · <span class="excl__tag">Exclusive — ended</span></p>
+  </div>
+  <p class="excl__days"><span class="excl__days-num">Expired</span><span class="excl__days-label">{{ p.days }} day{{ 's' if p.days != 1 }} ago</span></p>
+  <p class="excl__until">Ended {{ p.end|date_long }} · no longer blocks {{ p.category }} inquiries · kept for history</p>
+</div>
+{% elif p.state == 'active' %}
+<div class="excl">
+  <div>
+    <p class="excl__name">{{ p.brand }}</p>
+    <p class="excl__cat">{{ p.category }} · <span class="excl__tag">{{ icon('lock') }}EXCLUSIVE</span></p>
+  </div>
+  {% if p.days is not none %}
+  <p class="excl__days"><span class="excl__days-num num">{{ p.days }}</span><span class="excl__days-label">days remaining</span></p>
+  <p class="excl__until">Ends {{ p.end|date_long }} · blocks every {{ p.category }} inquiry going live before then</p>
+  {% else %}
+  <p class="excl__days"><span class="excl__days-label">no end date</span></p>
+  {% endif %}
+</div>
+{% else %}
+<div class="excl excl--nonexcl">
+  <div>
+    <p class="excl__name">{{ p.brand }}</p>
+    <p class="excl__cat">{{ p.category }} · <span class="excl__tag">Partner</span></p>
+  </div>
+  <p class="excl__until">Not exclusive · doesn't block other {{ p.category }} brands</p>
+</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro capacity(c) -%}
+<div class="cap cap--{{ 'full' if c.full else 'open' }}">
+  <div class="cap__line"><span><span class="cap__num num">{{ c.booked }} of {{ c.total }}</span> booked this month</span><span class="cap__state">{{ 'Full' if c.full else (c.open ~ ' open') }}</span></div>
+  <div class="cap__slots" role="img" aria-label="{{ c.booked }} of {{ c.total }} slots booked{{ ', full' if c.full }}">{% for booked in c.slots %}<span class="cap__slot{{ ' is-booked' if booked }}"></span>{% endfor %}</div>
+  {% if c.full %}<p class="help">New inquiries this month get a Capacity full flag.</p>{% endif %}
+</div>
+{%- endmacro %}

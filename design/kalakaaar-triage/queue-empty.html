@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triage queue — first run · Deal Desk</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="sample-band" role="note"><span class="sample-band__tag">SAMPLE DATA</span> Every creator, brand, message and amount on this screen is synthetic.</div>
+<header class="topbar">
+  <div class="topbar__inner">
+    <a class="topbar__brand" href="queue.html">Deal Desk <span class="topbar__agency">Kalakaaar Talent</span></a>
+    <nav class="nav" aria-label="Main">
+      <a class="nav__link" href="queue.html" aria-current="page">Queue</a>
+      <a class="nav__link" href="dm.html">DM intake</a>
+      <a class="nav__link" href="creator.html">Creators</a>
+      <a class="nav__link" href="pipeline.html">Pipeline</a>
+      <a class="nav__link" href="config.html">Config</a>
+    </nav>
+    <form class="ai-toggle ai-toggle--on" method="post" action="/settings/ai">
+      <input type="hidden" name="ai" value="off">
+      <button class="ai-toggle__btn" type="submit" aria-pressed="true"><span class="ai-toggle__light" aria-hidden="true"></span>AI ON <span class="ai-toggle__hint">click to turn off</span></button>
+    </form>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-head">
+    <div>
+      <h1>Triage queue</h1>
+      <p class="page-head__meta">Not scanned yet · 5 creator inboxes connected</p>
+    </div>
+  </div>
+
+  <!-- #skipped-notice renders empty before the first scan -->
+  <p id="skipped-notice" class="skipped visually-hidden"></p>
+
+  <!-- swap: #queue-list — empty state, before first scan. Filters hidden: nothing to filter. -->
+  <section id="queue-list" aria-label="Inquiries">
+    <div class="empty">
+      <p class="empty__title">The queue is empty until the first scan</p>
+      <p class="empty__body">A scan reads the 5 connected creator inboxes, keeps messages that match a brand keyword, and scores each one against that creator's rate card and rules. Nothing is sent from here.</p>
+      <div class="empty__actions">
+        <form method="post" action="/scan"><button class="btn btn--primary" type="submit">Scan inboxes</button></form>
+        <a class="btn" href="dm.html">Paste an Instagram DM</a>
+      </div>
+      <p class="help">Reference date for scoring: 19 Oct 2026 · change it in <a href="config.html">Config</a></p>
+    </div>
+  </section>
+  <!-- /swap: #queue-list -->
+</main>
+</body>
+</html>

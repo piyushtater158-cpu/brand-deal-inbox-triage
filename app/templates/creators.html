@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Creators{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Creators</h1>
+    <p class="page-head__meta">{{ rows|length }} creators on the Kalakaaar roster · rate cards, rules and partners per creator</p>
+  </div>
+</div>
+<section class="panel">
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th scope="col">Creator</th><th scope="col">Niche</th><th scope="col" class="is-num">Followers</th><th scope="col" class="is-num">Reel rate</th><th scope="col">Exclusive with</th><th scope="col">Capacity</th><th scope="col" class="is-num">In queue</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td><a href="/creator/{{ r.creator.id }}"><b>{{ r.creator.name }}</b></a> <span class="handle">{{ r.creator.ig_handle }}</span></td>
+          <td>{{ r.creator.niche|map('capitalize')|join(', ') }}</td>
+          <td class="is-num num">{{ r.creator.followers|num_in }}</td>
+          <td class="is-num num">{{ r.creator.rate_card.reel|inr }}</td>
+          <td>{% for p in r.active_exclusives %}<span class="excl__tag">{{ ui.icon('lock') }}{{ p.brand }}</span> {% else %}<span class="muted">—</span>{% endfor %}</td>
+          <td><span class="outcome outcome--{{ 'spam' if r.capacity.full else 'approved' }}">{{ r.capacity.booked }} of {{ r.capacity.total }}{{ ' · full' if r.capacity.full }}</span></td>
+          <td class="is-num">{{ r.count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

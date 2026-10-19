@@ -5,25 +5,12 @@ numbers, plainer sentences — not a degraded stand-in.
 from __future__ import annotations
 
 from app import ai
+from app.fmt import inr
 from app.models import Assessment, Creator, Extraction
 
 
 def _fmt_inr(amount: float | None) -> str:
-    if amount is None:
-        return "₹0"
-    n = int(round(amount))
-    s = str(n)
-    if len(s) <= 3:
-        return f"₹{s}"
-    last3 = s[-3:]
-    rest = s[:-3]
-    groups = []
-    while len(rest) > 2:
-        groups.insert(0, rest[-2:])
-        rest = rest[:-2]
-    if rest:
-        groups.insert(0, rest)
-    return "₹" + ",".join(groups + [last3])
+    return inr(amount, none="₹0")
 
 
 def _deliverables_str(ext: Extraction) -> str:

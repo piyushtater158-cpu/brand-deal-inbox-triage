@@ -1,68 +1,49 @@
 {% extends "base.html" %}
-{% block title %}{{ extraction.brand or 'Inquiry' }} — Inquiry Detail{% endblock %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{{ extraction.brand or 'Inquiry' }} → {{ creator.name }}{% endblock %}
 {% block content %}
-<a href="/" class="back-link">&larr; Back to queue</a>
-<div class="inquiry-detail">
-  <div class="pane raw-message-pane">
-    <h2>Original message</h2>
-    <dl class="message-meta">
-      <dt>From</dt><dd>{{ inquiry['sender_name'] }} &lt;{{ inquiry['sender_email_or_handle'] }}&gt;</dd>
-      <dt>Domain</dt><dd>{{ inquiry['sender_domain'] }}</dd>
-      <dt>Source</dt><dd>{{ inquiry['source']|upper }}</dd>
-      <dt>Received</dt><dd>{{ inquiry['received_at'][:19]|replace('T', ' ') }}</dd>
-      {% if inquiry['subject'] %}<dt>Subject</dt><dd>{{ inquiry['subject'] }}</dd>{% endif %}
-    </dl>
-    <pre class="raw-message-body">{{ inquiry['raw_text'] }}</pre>
+<p class="crumbs"><a href="/">Queue</a> / Inquiry {{ inquiry['id'] }}</p>
+<div class="page-head">
+  <div>
+    <h1>{{ extraction.brand or 'Brand not identified' }} → <a href="/creator/{{ creator.id }}">{{ creator.name }}</a></h1>
+    <p class="page-head__meta">{{ 'Instagram DM' if inquiry['source'] == 'dm' else 'Email' }} · received {{ inquiry['received_at']|datetime_long }}{% if nav.position %} · {{ nav.position }} of {{ nav.total }} in queue{% endif %}</p>
   </div>
+  <div class="page-head__actions">
+    {% if nav.prev_id %}<a class="btn btn--small" href="/inquiry/{{ nav.prev_id }}">← Previous</a>{% endif %}
+    {% if nav.next_id %}<a class="btn btn--small" href="/inquiry/{{ nav.next_id }}">Next →</a>{% endif %}
+  </div>
+</div>
 
-  <div class="pane fields-pane">
-    <h2>Extracted fields</h2>
-    {# Not a <form>: HTMX posts every input of an enclosing form, and all rows share name="value". #}
-    <div class="field-rows">
-      {% macro field_row(name, label, value, type='text') %}
-        <div class="field-row">
-          <label for="f_{{ name }}">{{ label }}</label>
-          <input id="f_{{ name }}" type="{{ type }}" name="value" value="{{ value if value is not none else '' }}"
-                 hx-post="/inquiry/{{ inquiry['id'] }}/edit" hx-target="#assessment" hx-swap="outerHTML"
-                 hx-trigger="change" hx-vals='{"field": "{{ name }}"}'>
-          <span class="provenance provenance-{{ extraction.provenance.get(name, 'rules') }}">{{ extraction.provenance.get(name, 'rules') }}</span>
-        </div>
-      {% endmacro %}
-
-      {{ field_row('brand', 'Brand', extraction.brand) }}
-      {{ field_row('brand_category', 'Category', extraction.brand_category) }}
-      <div class="field-row">
-        <label>Agency or direct</label>
-        <span class="static-value">{{ extraction.agency_or_direct }}</span>
-      </div>
-      {{ field_row('budget_amount', 'Budget (₹)', extraction.budget_amount, 'number') }}
-      {{ field_row('product_value', 'Product value (₹, barter)', extraction.product_value, 'number') }}
-      {% set deliverables_text %}{% for d in extraction.deliverables %}{{ d.count }} × {{ d.type|replace('_', ' ')|title }}{{ ', ' if not loop.last else '' }}{% endfor %}{% endset %}
-      {{ field_row('deliverables', 'Deliverables', deliverables_text) }}
-      {{ field_row('go_live_date', 'Go live date', extraction.go_live_date, 'date') }}
-      {{ field_row('response_deadline', 'Response deadline', extraction.response_deadline, 'date') }}
-      {{ field_row('usage_rights_days', 'Usage rights (days)', extraction.usage_rights_days, 'number') }}
-      <div class="field-row">
-        <label for="f_whitelisting">Whitelisting</label>
-        <input id="f_whitelisting" type="checkbox" name="value" value="true" {{ 'checked' if extraction.whitelisting else '' }}
-               hx-post="/inquiry/{{ inquiry['id'] }}/edit" hx-target="#assessment" hx-swap="outerHTML"
-               hx-trigger="change" hx-vals='{"field": "whitelisting"}'>
-        <span class="provenance provenance-{{ extraction.provenance.get('whitelisting', 'rules') }}">{{ extraction.provenance.get('whitelisting', 'rules') }}</span>
-      </div>
-      <div class="field-row">
-        <label for="f_exclusivity_requested">Exclusivity requested</label>
-        <input id="f_exclusivity_requested" type="checkbox" name="value" value="true" {{ 'checked' if extraction.exclusivity_requested else '' }}
-               hx-post="/inquiry/{{ inquiry['id'] }}/edit" hx-target="#assessment" hx-swap="outerHTML"
-               hx-trigger="change" hx-vals='{"field": "exclusivity_requested"}'>
-        <span class="provenance provenance-{{ extraction.provenance.get('exclusivity_requested', 'rules') }}">{{ extraction.provenance.get('exclusivity_requested', 'rules') }}</span>
-      </div>
-      {{ field_row('payment_advance_pct', 'Advance (%)', extraction.payment_advance_pct, 'number') }}
-      {{ field_row('payment_net_days', 'Net days', extraction.payment_net_days, 'number') }}
+<div class="detail">
+  <section class="detail__side panel" aria-labelledby="msg-h">
+    <div class="panel__head">
+      <h2 class="panel__title" id="msg-h">Original message</h2>
+      <span class="msg__source">{% if inquiry['source'] == 'dm' %}{{ ui.icon('dm') }}Instagram DM{% else %}{{ ui.icon('mail') }}{{ creator.email }} inbox{% endif %}</span>
     </div>
-  </div>
+    <dl class="msg__meta">
+      <dt>From</dt><dd>{{ inquiry['sender_name'] }}{% if inquiry['sender_email_or_handle'] and inquiry['sender_email_or_handle'] != inquiry['sender_name'] %} &lt;{{ inquiry['sender_email_or_handle'] }}&gt;{% endif %}</dd>
+      <dt>Domain</dt><dd><span class="msg__domain">{{ inquiry['sender_domain'] }}</span></dd>
+      {% if inquiry['subject'] %}<dt>Subject</dt><dd class="msg__subject">{{ inquiry['subject'] }}</dd>{% endif %}
+      <dt>Received</dt><dd>{{ inquiry['received_at']|datetime_long }}</dd>
+    </dl>
+<pre class="msg__body">{{ inquiry['raw_text'] }}</pre>
+  </section>
 
-  <div class="pane assessment-pane">
-    <h2>Assessment</h2>
+  <div class="detail__main">
+    <section class="panel" aria-labelledby="fields-h">
+      <div class="panel__head">
+        <h2 class="panel__title" id="fields-h">Extracted fields</h2>
+        <p class="prov-legend">Source:
+          <span class="prov prov--edited">Edited</span> you changed it
+          <span class="prov prov--rules">Rules</span> deterministic
+          <span class="prov prov--ai">AI</span> check it
+        </p>
+      </div>
+      <div class="fields">
+        {% for f in fields %}{{ ui.field_row(inquiry['id'], f) }}{% endfor %}
+      </div>
+    </section>
+
     {% include "partials/assessment.html" %}
   </div>
 </div>

@@ -1,10 +1,10 @@
-<div id="decision-result" class="decision-result">
-  {% if decision %}
-    <p class="decision-confirmed">
-      Logged: <strong>{{ decision['action']|replace('_', ' ')|title }}</strong> at {{ decision['timestamp'][:19]|replace('T', ' ') }}.
-      {% if decision['action'] in ('accept_and_negotiate', 'counter_offer', 'ask_for_info') %}
-        Reply is copy-ready above.
-      {% endif %}
-    </p>
-  {% endif %}
-</div>
+{% import "partials/ui.html" as ui %}
+<div id="decision-result" class="decision-result" aria-live="polite">{% if decision %}
+  <div class="decision">
+    {{ ui.icon('check', lg=true, cls='decision__icon') }}
+    <div>
+      <p class="decision__title">{{ decision.label }} · logged</p>
+      <p class="decision__detail">{{ decision.detail }}</p>
+    </div>
+  </div>
+{% endif %}</div>

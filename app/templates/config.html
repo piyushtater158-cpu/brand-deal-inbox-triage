@@ -1,45 +1,138 @@
 {% extends "base.html" %}
-{% block title %}Config — Brand Deal Inbox Triage{% endblock %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Config{% endblock %}
 {% block content %}
-<h1>Config</h1>
-<p class="subtitle">
-  Every threshold, weight, fee, keyword and spam pattern the engine uses. Nothing here
-  is hardcoded in Python — edit below and every inquiry recomputes on next scan or edit.
-</p>
-
-<div class="config-summary">
-  <h2>Scoring weights</h2>
-  <p>Rate fit {{ cfg.scoring_weights.rate_fit }} · Brand fit {{ cfg.scoring_weights.brand_fit }} ·
-     Urgency {{ cfg.scoring_weights.urgency }} · Completeness {{ cfg.scoring_weights.completeness }}</p>
-
-  <h2>Risk penalties</h2>
-  <p>Risky payment terms {{ cfg.risk_penalty.risky_payment_terms }} · Usage overreach {{ cfg.risk_penalty.usage_overreach }} ·
-     Suspicious sender {{ cfg.risk_penalty.suspicious_sender }} ·
-     Capacity full {{ cfg.risk_penalty.capacity_full }} · Blackout clash {{ cfg.risk_penalty.blackout_clash }}</p>
-
-  <h2>Thresholds</h2>
-  <p>Priority bands: P1 ≥{{ cfg.priority_bands.p1_min }}, P2 ≥{{ cfg.priority_bands.p2_min }}, P3 ≥{{ cfg.priority_bands.p3_min }} ·
-     Duplicate window {{ cfg.duplicate_window_days }} days · Reference date {{ cfg.reference_date }}</p>
-
-  <h2>Fees</h2>
-  <p>Usage +{{ (cfg.usage_fee_pct_per_30_days * 100)|round|int }}%/30 days ·
-     Whitelisting +{{ (cfg.whitelisting_fee_pct * 100)|round|int }}% ·
-     Exclusivity +{{ (cfg.exclusivity_fee_pct * 100)|round|int }}%</p>
-
-  <h2>Keywords</h2>
-  <p>{{ cfg.keywords|join(', ') }}</p>
-
-  <h2>Global no-go categories</h2>
-  <p>{{ cfg.global_no_go_categories|join(', ')|title }}</p>
+<div class="page-head">
+  <div>
+    <h1>Config</h1>
+    <p class="page-head__meta">Every number the scorer uses lives here, in <code>config.yaml</code>. Nothing is hardcoded. Saving re-scores the open queue.</p>
+  </div>
 </div>
 
-{% if error %}
-  <p class="config-error">Validation failed — nothing was saved: {{ error }}</p>
-{% endif %}
+{% if error %}<p class="alert config-error" role="alert">{{ ui.icon('x') }}<span>Validation failed — nothing was saved: {{ error }}</span></p>{% endif %}
+{% if saved %}<p class="cleared-note">{{ ui.icon('check') }} Saved · {{ rescored }} inquir{{ 'y' if rescored == 1 else 'ies' }} re-scored against the new values.</p>{% endif %}
 
-<form method="post" action="/config/update" class="config-editor">
-  <h2>Full config (YAML, pydantic-validated on save)</h2>
-  <textarea name="raw_yaml" rows="30" class="config-textarea">{{ raw_yaml or cfg|tojson(indent=2) }}</textarea>
-  <button type="submit" class="btn btn-primary">Validate &amp; save</button>
+<form class="config" method="post" action="/config/update">
+  <button class="visually-hidden" type="submit" name="do" value="save" tabindex="-1">Save config</button>
+
+  <fieldset class="fieldset">
+    <legend class="fieldset__legend">Reference date <span class="fieldset__desc">"Today" for every day count: deadlines, exclusivity, blackouts.</span></legend>
+    <div class="fieldset__body">
+      <div class="form-row"><label class="label" for="c-ref">Reference date</label><input class="input" id="c-ref" name="reference_date" type="date" value="{{ cfg.reference_date }}"></div>
+      <p class="help">Shown as {{ cfg.reference_date|date_long }}. Frozen so the seed's expected results never drift; a real deployment would leave it empty to use today.</p>
+    </div>
+  </fieldset>
+
+  <div class="grid-2">
+    <fieldset class="fieldset">
+      <legend class="fieldset__legend">Scoring weights <span class="fieldset__desc">Points available per factor. Must total 100.</span></legend>
+      <div class="fieldset__body">
+        {% for key, label in [('rate_fit', 'Rate fit'), ('brand_fit', 'Brand fit'), ('urgency', 'Urgency'), ('completeness', 'Completeness')] %}
+        <div class="form-row"><label class="label" for="w-{{ key }}">{{ label }}</label><input class="input num" id="w-{{ key }}" name="w_{{ key }}" value="{{ cfg.scoring_weights[key]|num_plain }}" inputmode="numeric"></div>
+        {% endfor %}
+        {% set total = cfg.scoring_weights.values()|sum %}
+        <p class="weights-sum"><span>Total</span><span class="{{ 'weights-sum__ok' if total == 100 }}">{% if total == 100 %}{{ ui.icon('check') }}{% endif %}{{ total|num_plain }}</span></p>
+      </div>
+    </fieldset>
+
+    <fieldset class="fieldset">
+      <legend class="fieldset__legend">Risk penalties <span class="fieldset__desc">Points subtracted when the flag is present.</span></legend>
+      <div class="fieldset__body">
+        {% for key, label in [('risky_payment_terms', 'Risky payment terms'), ('usage_overreach', 'Usage overreach'), ('suspicious_sender', 'Suspicious sender'), ('capacity_full', 'Capacity full'), ('blackout_clash', 'Blackout clash')] %}
+        <div class="form-row"><label class="label" for="p-{{ key }}">{{ label }}</label><div class="input-affix"><span class="input-affix__pre">−</span><input class="input num" id="p-{{ key }}" name="pen_{{ key }}" value="{{ cfg.risk_penalty[key]|num_plain }}" inputmode="numeric"></div></div>
+        {% endfor %}
+        <p class="help">Hard stops don't use penalties: Conflict caps the score at 20, No-go sets it to 0.</p>
+      </div>
+    </fieldset>
+  </div>
+
+  <div class="grid-2">
+    <fieldset class="fieldset">
+      <legend class="fieldset__legend">Thresholds</legend>
+      <div class="fieldset__body">
+        <div class="form-row"><label class="label" for="t-min">Default minimum acceptable</label><div class="input-affix"><input class="input num" id="t-min" name="min_acceptable_pct_default" value="{{ cfg.min_acceptable_pct_default|pct_num }}" inputmode="decimal"><span class="input-affix__post">% of quote</span></div></div>
+        <div class="form-row"><label class="label" for="t-urg">Urgent flag when due within</label><div class="input-affix"><input class="input num" id="t-urg" name="urgency_days_high" value="{{ cfg.urgency_days_high }}" inputmode="numeric"><span class="input-affix__post">days</span></div></div>
+        <div class="form-row"><label class="label" for="t-soon">Urgency points start within</label><div class="input-affix"><input class="input num" id="t-soon" name="urgency_days_medium" value="{{ cfg.urgency_days_medium }}" inputmode="numeric"><span class="input-affix__post">days</span></div></div>
+        <div class="form-row"><label class="label" for="t-dup">Duplicate window</label><div class="input-affix"><input class="input num" id="t-dup" name="duplicate_window_days" value="{{ cfg.duplicate_window_days }}" inputmode="numeric"><span class="input-affix__post">days</span></div></div>
+        <p class="label">Priority bands</p>
+        <div class="bands">
+          {% for p, key in [('P1', 'p1_min'), ('P2', 'p2_min'), ('P3', 'p3_min')] %}
+          <div class="band">{{ ui.pri(p) }}<label class="help" for="b-{{ key }}">score at least</label><input class="input num" id="b-{{ key }}" name="band_{{ key }}" value="{{ cfg.priority_bands[key]|num_plain }}" inputmode="numeric"></div>
+          {% endfor %}
+          <div class="band">{{ ui.pri('Ignore') }}<span class="help">below {{ cfg.priority_bands.p3_min|num_plain }}</span></div>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="fieldset">
+      <legend class="fieldset__legend">Fees <span class="fieldset__desc">Added on top of the content fee (rate card minus bundle discount).</span></legend>
+      <div class="fieldset__body">
+        {% for key, label in [('usage_fee_pct_per_30_days', 'Usage, per extra 30 days'), ('whitelisting_fee_pct', 'Whitelisting'), ('exclusivity_fee_pct', 'Exclusivity')] %}
+        <div class="form-row"><label class="label" for="f-{{ key }}">{{ label }}</label><div class="input-affix"><span class="input-affix__pre">+</span><input class="input num" id="f-{{ key }}" name="{{ key }}" value="{{ cfg[key]|pct_num }}" inputmode="decimal"><span class="input-affix__post">%</span></div></div>
+        {% endfor %}
+        <p class="help">Example: 90 days of usage against a 30-day allowance is 2 extra blocks, so +{{ (cfg.usage_fee_pct_per_30_days * 200)|round|int }}%.</p>
+      </div>
+    </fieldset>
+  </div>
+
+  <div class="grid-2">
+    <fieldset class="fieldset">
+      <legend class="fieldset__legend">Brand keywords <span class="fieldset__desc">A message is scanned only if it contains one of these. One per line.</span></legend>
+      <div class="fieldset__body">
+        <label class="visually-hidden" for="k-list">Brand keywords</label>
+<textarea class="textarea" id="k-list" name="keywords" rows="12">{{ cfg.keywords|join('\n') }}</textarea>
+        <p class="help">Matching ignores case. Hinglish spellings ("colab") are matched as written — add them here.</p>
+      </div>
+    </fieldset>
+
+    <fieldset class="fieldset">
+      <legend class="fieldset__legend">Agency-wide no-go categories <span class="fieldset__desc">Score 0 for every creator, on top of each creator's own list. One per line.</span></legend>
+      <div class="fieldset__body">
+        <label class="visually-hidden" for="g-nogo">Agency-wide no-go categories</label>
+<textarea class="textarea" id="g-nogo" name="global_no_go_categories" rows="12">{{ cfg.global_no_go_categories|join('\n') }}</textarea>
+      </div>
+    </fieldset>
+  </div>
+
+  <fieldset class="fieldset">
+    <legend class="fieldset__legend">Spam patterns <span class="fieldset__desc">Any hard pattern makes the message Spam with score 0. One per line.</span></legend>
+    <div class="fieldset__body grid-2">
+      {% for key, label in [('pay_to_join_phrases', 'Pay-to-join phrases'), ('crypto_forex_terms', 'Crypto / forex terms'), ('shortened_link_domains', 'Shortened-link domains'), ('free_mail_domains', 'Free-mail domains (Suspicious sender when a big brand name sends from one)')] %}
+      <div>
+        <label class="label" for="s-{{ key }}">{{ label }}</label>
+<textarea class="textarea" id="s-{{ key }}" name="spam_{{ key }}" rows="6">{{ cfg.spam_patterns[key]|join('\n') }}</textarea>
+      </div>
+      {% endfor %}
+    </div>
+  </fieldset>
+
+  <fieldset class="fieldset">
+    <legend class="fieldset__legend">Brand → category lookup <span class="fieldset__desc">Decides Category (shown as Rules) and drives the conflict and no-go checks.</span></legend>
+    <div class="table-wrap">
+      <table class="table lookup">
+        <thead><tr><th scope="col">Brand</th><th scope="col">Category</th><th scope="col"><span class="visually-hidden">Remove</span></th></tr></thead>
+        <tbody>
+          {% for brand, category in cfg.brand_category_lookup.items() %}
+          <tr><td><input class="input" aria-label="Brand" name="lk_brand" value="{{ brand }}"></td><td><input class="input" aria-label="Category for {{ brand }}" name="lk_cat" value="{{ category }}"></td><td><button class="btn btn--small" type="submit" name="remove" value="{{ loop.index0 }}">Remove</button></td></tr>
+          {% endfor %}
+          <tr><td><input class="input" aria-label="New brand" name="lk_brand" value="" placeholder="Add brand"></td><td><input class="input" aria-label="New category" name="lk_cat" value="" placeholder="Category"></td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </fieldset>
+
+  <div class="savebar">
+    <span class="muted">Saving validates every value before writing <code>config.yaml</code>, then re-scores {{ inquiry_count }} inquir{{ 'y' if inquiry_count == 1 else 'ies' }}.</span>
+    <button class="btn btn--primary" type="submit" name="do" value="save">Save config</button>
+  </div>
 </form>
+
+<details class="panel"{{ ' open' if raw_yaml }}>
+  <summary class="details__summary">Advanced — edit the full config.yaml (brand fit scores, adjacency, known brands, lookalike domains, AI settings)</summary>
+  <form class="config-editor panel__body stack" method="post" action="/config/update">
+    <label class="visually-hidden" for="raw-yaml">Full config</label>
+    <textarea class="textarea config-yaml" id="raw-yaml" name="raw_yaml" rows="30">{{ raw_yaml or cfg_yaml }}</textarea>
+    <div class="form-foot"><button class="btn btn--primary" type="submit">Validate &amp; save YAML</button></div>
+  </form>
+</details>
 {% endblock %}

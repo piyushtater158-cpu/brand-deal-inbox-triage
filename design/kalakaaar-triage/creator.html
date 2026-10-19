@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aanya Mehra · Deal Desk</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="sample-band" role="note"><span class="sample-band__tag">SAMPLE DATA</span> Every creator, brand, message and amount on this screen is synthetic.</div>
+<header class="topbar">
+  <div class="topbar__inner">
+    <a class="topbar__brand" href="queue.html">Deal Desk <span class="topbar__agency">Kalakaaar Talent</span></a>
+    <nav class="nav" aria-label="Main">
+      <a class="nav__link" href="queue.html">Queue</a>
+      <a class="nav__link" href="dm.html">DM intake</a>
+      <a class="nav__link" href="creator.html" aria-current="page">Creators</a>
+      <a class="nav__link" href="pipeline.html">Pipeline</a>
+      <a class="nav__link" href="config.html">Config</a>
+    </nav>
+    <form class="ai-toggle ai-toggle--on" method="post" action="/settings/ai">
+      <input type="hidden" name="ai" value="off">
+      <button class="ai-toggle__btn" type="submit" aria-pressed="true"><span class="ai-toggle__light" aria-hidden="true"></span>AI ON <span class="ai-toggle__hint">click to turn off</span></button>
+    </form>
+  </div>
+</header>
+
+<main class="page stack">
+  <p class="crumbs"><a href="#">Creators</a> / Aanya Mehra</p>
+
+  <section class="panel profile" aria-labelledby="who">
+    <div class="profile__mono" aria-hidden="true">AM</div>
+    <div>
+      <h1 id="who">Aanya Mehra <span class="handle">@aanyamehra</span></h1>
+      <p class="profile__facts"><span>Beauty &amp; Skincare</span><span>Mumbai</span><span>Hindi, English</span></p>
+    </div>
+    <dl class="stats">
+      <div><dt class="stat__label">Followers</dt><dd class="stat__num num">1,82,400</dd></div>
+      <div><dt class="stat__label">Avg reach</dt><dd class="stat__num num">96,000</dd></div>
+      <div><dt class="stat__label">Engagement</dt><dd class="stat__num num">4.1%</dd></div>
+    </dl>
+  </section>
+
+  <div class="grid-3">
+    <!-- Rate card -->
+    <form class="panel" method="post" action="/creator/aanya/rates">
+      <div class="panel__head"><h2 class="panel__title">Rate card</h2><span class="panel__sub">per deliverable</span></div>
+      <div class="panel__body form-rows">
+        <div class="form-row"><label class="label" for="r-reel">Reel</label><div class="input-affix"><span class="input-affix__pre">₹</span><input class="input num" id="r-reel" name="reel" value="62,000" inputmode="numeric"></div></div>
+        <div class="form-row"><label class="label" for="r-story">Story</label><div class="input-affix"><span class="input-affix__pre">₹</span><input class="input num" id="r-story" name="story" value="18,000" inputmode="numeric"></div></div>
+        <div class="form-row"><label class="label" for="r-static">Static post</label><div class="input-affix"><span class="input-affix__pre">₹</span><input class="input num" id="r-static" name="static" value="34,000" inputmode="numeric"></div></div>
+        <div class="form-row"><label class="label" for="r-car">Carousel</label><div class="input-affix"><span class="input-affix__pre">₹</span><input class="input num" id="r-car" name="carousel" value="45,000" inputmode="numeric"></div></div>
+        <div class="form-row"><label class="label" for="r-bundle">Bundle discount</label><div class="input-affix"><input class="input num" id="r-bundle" name="bundle" value="10" inputmode="numeric"><span class="input-affix__post">%</span></div></div>
+        <div class="form-foot"><button class="btn btn--primary" type="submit">Save rates</button></div>
+      </div>
+    </form>
+
+    <!-- Rules -->
+    <form class="panel" method="post" action="/creator/aanya/rules">
+      <div class="panel__head"><h2 class="panel__title">Rules</h2><span class="panel__sub">used in every score</span></div>
+      <div class="panel__body form-rows">
+        <div class="form-row"><label class="label" for="u-min">Minimum acceptable</label><div class="input-affix"><input class="input num" id="u-min" name="min_pct" value="70" inputmode="numeric"><span class="input-affix__post">% of quote</span></div></div>
+        <div class="form-row"><label class="label" for="u-barter">Accepts barter</label><select class="select" id="u-barter" name="barter"><option>Yes</option><option selected>No</option></select></div>
+        <div class="form-row"><label class="label" for="u-usage">Usage rights default</label><div class="input-affix"><input class="input num" id="u-usage" name="usage_default" value="30" inputmode="numeric"><span class="input-affix__post">days</span></div></div>
+        <div class="form-row"><label class="label" for="u-max">Max usage without extra fee</label><div class="input-affix"><input class="input num" id="u-max" name="usage_free" value="30" inputmode="numeric"><span class="input-affix__post">days</span></div></div>
+        <div class="form-foot"><button class="btn btn--primary" type="submit">Save rules</button></div>
+      </div>
+    </form>
+
+    <!-- Availability -->
+    <section class="panel" aria-labelledby="avail-h">
+      <div class="panel__head"><h2 class="panel__title" id="avail-h">Availability</h2><span class="panel__sub">October 2026</span></div>
+      <div class="panel__body stack">
+        <div class="cap cap--open">
+          <div class="cap__line"><span><span class="cap__num num">2 of 4</span> booked this month</span><span class="cap__state">2 open</span></div>
+          <div class="cap__slots" role="img" aria-label="2 of 4 slots booked"><span class="cap__slot is-booked"></span><span class="cap__slot is-booked"></span><span class="cap__slot"></span><span class="cap__slot"></span></div>
+        </div>
+        <form class="form-row" method="post" action="/creator/aanya/capacity"><label class="label" for="c-max">Monthly capacity</label><input class="input num" id="c-max" name="capacity" value="4" inputmode="numeric"></form>
+        <div class="blackout">
+          <h3 class="assessment__h">Blackout dates</h3>
+          <p class="blackout-none">None set. Inquiries are not checked against any dates.</p>
+          <a class="btn btn--small" href="#">Add blackout dates</a>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid-2">
+    <section class="panel" aria-labelledby="partners-h">
+      <div class="panel__head"><h2 class="panel__title" id="partners-h">Partners</h2><a class="btn btn--small" href="#">Add partner</a></div>
+      <div class="panel__body stack">
+        <div class="excl">
+          <div>
+            <p class="excl__name">Santoor</p>
+            <p class="excl__cat">Personal care · <span class="excl__tag"><svg class="i" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>EXCLUSIVE</span></p>
+          </div>
+          <p class="excl__days"><span class="excl__days-num num">163</span><span class="excl__days-label">days remaining</span></p>
+          <p class="excl__until">Ends 31 Mar 2027 · blocks every Personal care inquiry going live before then</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="nogo-h">
+      <div class="panel__head"><h2 class="panel__title" id="nogo-h">No-go categories</h2><span class="panel__sub">auto-score 0, flagged No-go</span></div>
+      <div class="panel__body stack">
+        <ul class="nogo">
+          <li class="nogo__item">Betting <form method="post" action="/creator/aanya/nogo/remove"><button class="nogo__remove" type="submit" name="cat" value="betting" aria-label="Remove Betting">×</button></form></li>
+          <li class="nogo__item">Tobacco <form method="post" action="/creator/aanya/nogo/remove"><button class="nogo__remove" type="submit" name="cat" value="tobacco" aria-label="Remove Tobacco">×</button></form></li>
+          <li class="nogo__item">Fairness creams <form method="post" action="/creator/aanya/nogo/remove"><button class="nogo__remove" type="submit" name="cat" value="fairness" aria-label="Remove Fairness creams">×</button></form></li>
+        </ul>
+        <form class="form-row" method="post" action="/creator/aanya/nogo"><label class="visually-hidden" for="nogo-add">Add category</label><input class="input" id="nogo-add" name="cat" placeholder="Add a category"><button class="btn" type="submit">Add</button></form>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="hist-h">
+    <div class="panel__head"><h2 class="panel__title" id="hist-h">Inquiry history</h2><span class="panel__sub">last 60 days</span></div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th scope="col">Brand</th><th scope="col">Received</th><th scope="col" class="is-num">Score</th><th scope="col" class="is-num">Offered</th><th scope="col">Outcome</th></tr></thead>
+        <tbody>
+          <tr><td><a href="inquiry.html">Nivara Soaps</a></td><td>17 Oct 2026</td><td class="is-num">20</td><td class="is-num num">₹1,50,000</td><td><span class="outcome outcome--open">In queue</span></td></tr>
+          <tr><td><a href="inquiry-approved.html">Lumière Skin Co.</a></td><td>16 Oct 2026</td><td class="is-num">83</td><td class="is-num num">₹1,50,000</td><td><span class="outcome outcome--open">In queue</span></td></tr>
+          <tr><td>giftz-promo.top</td><td>17 Oct 2026</td><td class="is-num">2</td><td class="is-num num">₹5,00,000</td><td><span class="outcome outcome--spam">Marked spam</span></td></tr>
+          <tr><td>Dewdrop Naturals</td><td>15 Oct 2026</td><td class="is-num">76</td><td class="is-num num">₹1,10,000</td><td><span class="outcome outcome--approved">Approved</span></td></tr>
+          <tr><td>GlowFair Cream</td><td>24 Sep 2026</td><td class="is-num">0</td><td class="is-num num">₹2,50,000</td><td><span class="outcome outcome--declined">Declined</span></td></tr>
+          <tr><td>Kesar Beauty</td><td>11 Sep 2026</td><td class="is-num">52</td><td class="is-num muted">Not stated</td><td><span class="outcome outcome--asked">Asked for info</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+</body>
+</html>

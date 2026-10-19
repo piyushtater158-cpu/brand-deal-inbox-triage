@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime as dt
 
 from app.config_loader import load_config
+from app.fmt import inr
 from app.models import Assessment, Creator, Extraction
 from app.quote import compute_quote, round_counter_offer
 from app.spam import detect_spam
@@ -276,7 +277,7 @@ def assess(
     elif rate_fit_pct is not None:
         reason_parts.append(f"{rate_fit_pct:.0f}% of rate card.")
         if recommended_action == "counter_offer" and counter_offer_amount:
-            reason_parts.append(f"Counter at ₹{counter_offer_amount:,.0f}.")
+            reason_parts.append(f"Counter at {inr(counter_offer_amount)}.")
 
     if is_urgent:
         reason_parts.append("Urgent — reply needed within 48 hours.")

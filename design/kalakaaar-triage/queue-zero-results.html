@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triage queue — no matches · Deal Desk</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="sample-band" role="note"><span class="sample-band__tag">SAMPLE DATA</span> Every creator, brand, message and amount on this screen is synthetic.</div>
+<header class="topbar">
+  <div class="topbar__inner">
+    <a class="topbar__brand" href="queue.html">Deal Desk <span class="topbar__agency">Kalakaaar Talent</span></a>
+    <nav class="nav" aria-label="Main">
+      <a class="nav__link" href="queue.html" aria-current="page">Queue</a>
+      <a class="nav__link" href="dm.html">DM intake</a>
+      <a class="nav__link" href="creator.html">Creators</a>
+      <a class="nav__link" href="pipeline.html">Pipeline</a>
+      <a class="nav__link" href="config.html">Config</a>
+    </nav>
+    <form class="ai-toggle ai-toggle--on" method="post" action="/settings/ai">
+      <input type="hidden" name="ai" value="off">
+      <button class="ai-toggle__btn" type="submit" aria-pressed="true"><span class="ai-toggle__light" aria-hidden="true"></span>AI ON <span class="ai-toggle__hint">click to turn off</span></button>
+    </form>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-head">
+    <div>
+      <h1>Triage queue</h1>
+      <p class="page-head__meta">5 open inquiries · 4 creators · last scan 19 Oct 2026, 15:30</p>
+    </div>
+    <div class="page-head__actions">
+      <form method="post" action="/scan"><button class="btn btn--primary" type="submit">Scan inboxes</button></form>
+    </div>
+  </div>
+
+  <p id="skipped-notice" class="skipped">
+    <svg class="i" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 7v4.2M8 4.6v.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    <span><b>6 messages skipped</b> — no brand keywords matched.</span>
+    <a href="/skipped">View list</a>
+  </p>
+
+  <form class="filters panel" method="get" action="/" hx-get="/" hx-target="#queue-list" hx-select="#queue-list" hx-swap="outerHTML" hx-trigger="change">
+    <div>
+      <label class="label" for="f-creator">Creator</label>
+      <select class="select" id="f-creator" name="creator">
+        <option value="">All creators</option>
+        <option value="aanya">Aanya Mehra</option>
+        <option value="rohan">Rohan Iyer</option>
+        <option value="kabir">Kabir Shah</option>
+        <option value="tara" selected>Tara Dsouza</option>
+        <option value="meher">Meher Kaur</option>
+      </select>
+    </div>
+    <div>
+      <label class="label" for="f-type">Type</label>
+      <select class="select" id="f-type" name="type">
+        <option value="">All types</option>
+        <option>Paid</option><option>Barter</option><option>Hybrid</option><option>Spam</option><option>Not a deal</option>
+      </select>
+    </div>
+    <div>
+      <label class="label" for="f-flag">Flag</label>
+      <select class="select" id="f-flag" name="flag">
+        <option value="">Any flag</option>
+        <optgroup label="Hard stops"><option selected>Conflict</option><option>No-go</option></optgroup>
+        <optgroup label="Risks"><option>Risky payment terms</option><option>Usage overreach</option><option>Suspicious sender</option></optgroup>
+        <optgroup label="Notices"><option>Lowball</option><option>Missing info</option><option>Duplicate</option><option>Urgent</option><option>Capacity full</option><option>Blackout clash</option></optgroup>
+        <option value="none">No flags</option>
+      </select>
+    </div>
+    <div>
+      <label class="label" for="f-pri">Priority</label>
+      <select class="select" id="f-pri" name="priority">
+        <option value="">All priorities</option>
+        <option>P1</option><option>P2</option><option>P3</option><option>Ignore</option>
+      </select>
+    </div>
+    <button class="btn" type="submit">Apply</button>
+    <a class="btn btn--quiet" href="queue.html">Clear</a>
+  </form>
+
+  <!-- swap: #queue-list — zero-results state -->
+  <section id="queue-list" aria-label="Inquiries">
+    <div class="empty">
+      <p class="empty__title">No inquiries match these filters</p>
+      <ul class="active-filters" aria-label="Active filters">
+        <li class="active-filter">Creator: Tara Dsouza</li>
+        <li class="active-filter">Flag: Conflict</li>
+      </ul>
+      <p class="empty__body">Tara has 1 open inquiry, and it has no flags. The other 4 inquiries in the queue belong to other creators.</p>
+      <div class="empty__actions">
+        <a class="btn" href="queue.html?creator=tara">Show all of Tara's</a>
+        <a class="btn btn--quiet" href="queue.html">Clear all filters</a>
+      </div>
+    </div>
+  </section>
+  <!-- /swap: #queue-list -->
+</main>
+</body>
+</html>

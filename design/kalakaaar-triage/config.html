@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Config · Deal Desk</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="sample-band" role="note"><span class="sample-band__tag">SAMPLE DATA</span> Every creator, brand, message and amount on this screen is synthetic.</div>
+<header class="topbar">
+  <div class="topbar__inner">
+    <a class="topbar__brand" href="queue.html">Deal Desk <span class="topbar__agency">Kalakaaar Talent</span></a>
+    <nav class="nav" aria-label="Main">
+      <a class="nav__link" href="queue.html">Queue</a>
+      <a class="nav__link" href="dm.html">DM intake</a>
+      <a class="nav__link" href="creator.html">Creators</a>
+      <a class="nav__link" href="pipeline.html">Pipeline</a>
+      <a class="nav__link" href="config.html" aria-current="page">Config</a>
+    </nav>
+    <form class="ai-toggle ai-toggle--on" method="post" action="/settings/ai">
+      <input type="hidden" name="ai" value="off">
+      <button class="ai-toggle__btn" type="submit" aria-pressed="true"><span class="ai-toggle__light" aria-hidden="true"></span>AI ON <span class="ai-toggle__hint">click to turn off</span></button>
+    </form>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-head">
+    <div>
+      <h1>Config</h1>
+      <p class="page-head__meta">Every number the scorer uses lives here. Nothing is hardcoded. Saving re-scores the open queue.</p>
+    </div>
+  </div>
+
+  <form class="config" method="post" action="/config">
+    <!-- default submit: Enter in any field saves, never hits a Remove button -->
+    <button class="visually-hidden" type="submit" name="do" value="save" tabindex="-1">Save config</button>
+
+    <fieldset class="fieldset">
+      <legend class="fieldset__legend">Reference date <span class="fieldset__desc">"Today" for every day count: deadlines, exclusivity, blackouts.</span></legend>
+      <div class="fieldset__body">
+        <div class="form-row"><label class="label" for="c-ref">Reference date</label><input class="input" id="c-ref" name="reference_date" type="date" value="2026-10-19"></div>
+        <p class="help">Shown as 19 Oct 2026. Leave as today's date in production.</p>
+      </div>
+    </fieldset>
+
+    <div class="grid-2">
+      <fieldset class="fieldset">
+        <legend class="fieldset__legend">Scoring weights <span class="fieldset__desc">Points available per factor. Must total 100.</span></legend>
+        <div class="fieldset__body">
+          <div class="form-row"><label class="label" for="w-rate">Rate fit</label><input class="input num" id="w-rate" name="w_rate" value="45" inputmode="numeric"></div>
+          <div class="form-row"><label class="label" for="w-brand">Brand fit</label><input class="input num" id="w-brand" name="w_brand" value="25" inputmode="numeric"></div>
+          <div class="form-row"><label class="label" for="w-urg">Urgency</label><input class="input num" id="w-urg" name="w_urgency" value="15" inputmode="numeric"></div>
+          <div class="form-row"><label class="label" for="w-comp">Completeness</label><input class="input num" id="w-comp" name="w_complete" value="15" inputmode="numeric"></div>
+          <p class="weights-sum"><span>Total</span><span class="weights-sum__ok"><svg class="i" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>100</span></p>
+        </div>
+      </fieldset>
+
+      <fieldset class="fieldset">
+        <legend class="fieldset__legend">Risk penalties <span class="fieldset__desc">Points subtracted when the flag is present.</span></legend>
+        <div class="fieldset__body">
+          <div class="form-row"><label class="label" for="p-pay">Risky payment terms</label><div class="input-affix"><span class="input-affix__pre">−</span><input class="input num" id="p-pay" name="pen_payment" value="10" inputmode="numeric"></div></div>
+          <div class="form-row"><label class="label" for="p-usage">Usage overreach</label><div class="input-affix"><span class="input-affix__pre">−</span><input class="input num" id="p-usage" name="pen_usage" value="5" inputmode="numeric"></div></div>
+          <div class="form-row"><label class="label" for="p-sus">Suspicious sender</label><div class="input-affix"><span class="input-affix__pre">−</span><input class="input num" id="p-sus" name="pen_sender" value="15" inputmode="numeric"></div></div>
+          <p class="help">Hard stops don't use penalties: Conflict caps the score at 20, No-go sets it to 0.</p>
+        </div>
+      </fieldset>
+    </div>
+
+    <div class="grid-2">
+      <fieldset class="fieldset">
+        <legend class="fieldset__legend">Thresholds</legend>
+        <div class="fieldset__body">
+          <div class="form-row"><label class="label" for="t-min">Default minimum acceptable</label><div class="input-affix"><input class="input num" id="t-min" name="min_pct" value="70" inputmode="numeric"><span class="input-affix__post">% of quote</span></div></div>
+          <div class="form-row"><label class="label" for="t-urg">Urgent flag when reply due within</label><div class="input-affix"><input class="input num" id="t-urg" name="urgent_days" value="2" inputmode="numeric"><span class="input-affix__post">days</span></div></div>
+          <div class="form-row"><label class="label" for="t-soon">Urgency points start within</label><div class="input-affix"><input class="input num" id="t-soon" name="soon_days" value="7" inputmode="numeric"><span class="input-affix__post">days</span></div></div>
+          <div class="form-row"><label class="label" for="t-dup">Duplicate window</label><div class="input-affix"><input class="input num" id="t-dup" name="dup_days" value="14" inputmode="numeric"><span class="input-affix__post">days</span></div></div>
+          <p class="label">Priority bands</p>
+          <div class="bands">
+            <div class="band"><span class="pri pri--p1">P1</span><label class="help" for="b-p1">score at least</label><input class="input num" id="b-p1" name="band_p1" value="70" inputmode="numeric"></div>
+            <div class="band"><span class="pri pri--p2">P2</span><label class="help" for="b-p2">score at least</label><input class="input num" id="b-p2" name="band_p2" value="40" inputmode="numeric"></div>
+            <div class="band"><span class="pri pri--p3">P3</span><label class="help" for="b-p3">score at least</label><input class="input num" id="b-p3" name="band_p3" value="20" inputmode="numeric"></div>
+            <div class="band"><span class="pri pri--ignore">Ignore</span><span class="help">below 20</span></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="fieldset">
+        <legend class="fieldset__legend">Fees <span class="fieldset__desc">Added on top of the content fee (rate card minus bundle discount).</span></legend>
+        <div class="fieldset__body">
+          <div class="form-row"><label class="label" for="f-usage">Usage, per extra 30 days</label><div class="input-affix"><span class="input-affix__pre">+</span><input class="input num" id="f-usage" name="fee_usage" value="20" inputmode="numeric"><span class="input-affix__post">%</span></div></div>
+          <div class="form-row"><label class="label" for="f-wl">Whitelisting</label><div class="input-affix"><span class="input-affix__pre">+</span><input class="input num" id="f-wl" name="fee_whitelist" value="25" inputmode="numeric"><span class="input-affix__post">%</span></div></div>
+          <div class="form-row"><label class="label" for="f-ex">Exclusivity</label><div class="input-affix"><span class="input-affix__pre">+</span><input class="input num" id="f-ex" name="fee_exclusive" value="30" inputmode="numeric"><span class="input-affix__post">%</span></div></div>
+          <p class="help">Example: 90 days of usage against a 30-day allowance is 2 extra blocks, so +40%.</p>
+        </div>
+      </fieldset>
+    </div>
+
+    <div class="grid-2">
+      <fieldset class="fieldset">
+        <legend class="fieldset__legend">Brand keywords <span class="fieldset__desc">A message is scanned only if it contains one of these. One per line.</span></legend>
+        <div class="fieldset__body">
+          <label class="visually-hidden" for="k-list">Brand keywords</label>
+<textarea class="textarea" id="k-list" name="keywords" rows="12">collab
+collaboration
+sponsorship
+sponsored
+barter
+PR package
+ambassador
+paid partnership
+brand deal
+campaign
+gifting
+promotion</textarea>
+          <p class="help">Matching ignores case. Hinglish spellings ("colab", "collab karna") are matched as written — add them here.</p>
+        </div>
+      </fieldset>
+
+      <fieldset class="fieldset">
+        <legend class="fieldset__legend">Spam patterns <span class="fieldset__desc">Any match flags Suspicious sender. One per line.</span></legend>
+        <div class="fieldset__body">
+          <label class="visually-hidden" for="s-list">Spam patterns</label>
+<textarea class="textarea" id="s-list" name="spam_patterns" rows="12">registration fee
+processing fee
+you have been selected
+claim your reward
+crypto payment
+WhatsApp only
+*.top
+*.xyz
+gmail.com sender claiming a brand</textarea>
+          <p class="help">Lines starting with * match the sender's domain.</p>
+        </div>
+      </fieldset>
+    </div>
+
+    <fieldset class="fieldset">
+      <legend class="fieldset__legend">Brand → category lookup <span class="fieldset__desc">Decides Category (shown as Rules) and drives conflict and no-go checks.</span></legend>
+      <div class="table-wrap">
+        <table class="table lookup">
+          <thead><tr><th scope="col">Brand</th><th scope="col">Category</th><th scope="col"><span class="visually-hidden">Remove</span></th></tr></thead>
+          <tbody>
+            <tr><td><input class="input" aria-label="Brand" name="lk_brand[]" value="Santoor"></td><td><input class="input" aria-label="Category for Santoor" name="lk_cat[]" value="Personal care"></td><td><button class="btn btn--small" type="submit" name="remove" value="0">Remove</button></td></tr>
+            <tr><td><input class="input" aria-label="Brand" name="lk_brand[]" value="Nivara Soaps"></td><td><input class="input" aria-label="Category for Nivara Soaps" name="lk_cat[]" value="Personal care"></td><td><button class="btn btn--small" type="submit" name="remove" value="1">Remove</button></td></tr>
+            <tr><td><input class="input" aria-label="Brand" name="lk_brand[]" value="Lumière Skin Co."></td><td><input class="input" aria-label="Category for Lumière Skin Co." name="lk_cat[]" value="Skincare"></td><td><button class="btn btn--small" type="submit" name="remove" value="2">Remove</button></td></tr>
+            <tr><td><input class="input" aria-label="Brand" name="lk_brand[]" value="FitFuel India"></td><td><input class="input" aria-label="Category for FitFuel India" name="lk_cat[]" value="Health &amp; nutrition"></td><td><button class="btn btn--small" type="submit" name="remove" value="3">Remove</button></td></tr>
+            <tr><td><input class="input" aria-label="Brand" name="lk_brand[]" value="BetKing11"></td><td><input class="input" aria-label="Category for BetKing11" name="lk_cat[]" value="Betting"></td><td><button class="btn btn--small" type="submit" name="remove" value="4">Remove</button></td></tr>
+            <tr><td><input class="input" aria-label="Brand" name="lk_brand[]" value="Zephyr Travel Co."></td><td><input class="input" aria-label="Category for Zephyr Travel Co." name="lk_cat[]" value="Travel"></td><td><button class="btn btn--small" type="submit" name="remove" value="5">Remove</button></td></tr>
+            <tr><td><input class="input" aria-label="New brand" name="lk_brand[]" value="" placeholder="Add brand"></td><td><input class="input" aria-label="New category" name="lk_cat[]" value="" placeholder="Category"></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </fieldset>
+
+    <div class="savebar">
+      <span class="muted">Last saved 18 Oct 2026, 19:05 · saving re-scores 5 open inquiries</span>
+      <button class="btn btn--primary" type="submit" name="do" value="save">Save config</button>
+    </div>
+  </form>
+</main>
+</body>
+</html>

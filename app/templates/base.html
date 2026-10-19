@@ -1,33 +1,32 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-IN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Brand Deal Inbox Triage{% endblock %}</title>
-  <script src="/static/htmx.min.js"></script>
+  <title>{% block title %}Deal Desk{% endblock %} · Deal Desk</title>
   <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/app.js" defer></script>
 </head>
 <body>
-  <div class="sample-data-banner">SAMPLE DATA — every creator, brand and message in this app is synthetic</div>
-  <header class="chrome">
-    <div class="chrome-left">
-      <a href="/" class="brand-name">Brand Deal Inbox Triage</a>
-      <nav>
-        <a href="/">Queue</a>
-        <a href="/dm">DM Intake</a>
-        <a href="/pipeline">Pipeline</a>
-        <a href="/config">Config</a>
-      </nav>
-    </div>
-    <form method="post" action="/settings/ai-toggle" class="ai-toggle-form">
+{% set nav_items = [('queue', '/', 'Queue'), ('dm', '/dm', 'DM intake'), ('creators', '/creators', 'Creators'), ('pipeline', '/pipeline', 'Pipeline'), ('config', '/config', 'Config')] %}
+<div class="sample-band" role="note"><span class="sample-band__tag">SAMPLE DATA</span> Every creator, brand, message and amount on this screen is synthetic.</div>
+<header class="topbar">
+  <div class="topbar__inner">
+    <a class="topbar__brand" href="/">Deal Desk <span class="topbar__agency">Kalakaaar Talent</span></a>
+    <nav class="nav" aria-label="Main">
+      {% for key, href, label in nav_items %}
+      <a class="nav__link" href="{{ href }}"{{ ' aria-current="page"'|safe if active == key }}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+    <form class="ai-toggle ai-toggle--{{ 'on' if ai_on else 'off' }}" method="post" action="/settings/ai-toggle">
       <input type="hidden" name="enabled" value="{{ 'false' if ai_on else 'true' }}">
-      <button type="submit" class="ai-toggle {{ 'on' if ai_on else 'off' }}">
-        AI {{ 'ON' if ai_on else 'OFF' }}
-      </button>
+      <button class="ai-toggle__btn" type="submit" aria-pressed="{{ 'true' if ai_on else 'false' }}"><span class="ai-toggle__light" aria-hidden="true"></span>{{ 'AI ON' if ai_on else 'AI OFF' }} <span class="ai-toggle__hint">click to turn {{ 'off' if ai_on else 'on' }}</span></button>
     </form>
-  </header>
-  <main class="page">
-    {% block content %}{% endblock %}
-  </main>
+  </div>
+</header>
+<main class="page{{ ' stack' if stack_page }}">
+{% block content %}{% endblock %}
+</main>
 </body>
 </html>

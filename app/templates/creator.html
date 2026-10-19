@@ -1,95 +1,118 @@
 {% extends "base.html" %}
-{% block title %}{{ creator.name }} — Creator Profile{% endblock %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{{ creator.name }}{% endblock %}
 {% block content %}
-<a href="/" class="back-link">&larr; Back to queue</a>
-<h1>{{ creator.name }} <span class="handle">{{ creator.ig_handle }}</span></h1>
-<p class="creator-meta">
-  {{ creator.niche|join(', ')|title }} · {{ creator.city }} · {{ creator.languages|join(', ') }} ·
-  {{ "{:,}".format(creator.followers) }} followers · {{ "{:,}".format(creator.avg_reach) }} avg reach ·
-  {{ creator.engagement_rate }}% engagement
-</p>
+<p class="crumbs"><a href="/creators">Creators</a> / {{ creator.name }}</p>
 
-<form method="post" action="/creator/{{ creator.id }}/update" class="rate-card-form">
-  <h2>Rate card</h2>
-  <label>Reel (₹) <input type="number" name="reel" value="{{ creator.rate_card.reel }}"></label>
-  <label>Story (₹) <input type="number" name="story" value="{{ creator.rate_card.story }}"></label>
-  <label>Static post (₹) <input type="number" name="static_post" value="{{ creator.rate_card.static_post }}"></label>
-  <label>Carousel (₹) <input type="number" name="carousel" value="{{ creator.rate_card.carousel }}"></label>
-  <label>Bundle discount
-    <input type="number" step="0.01" name="bundle_discount_pct" value="{{ creator.rate_card.bundle_discount_pct }}"></label>
+{% if saved %}<p class="cleared-note">{{ ui.icon('check') }} Saved · {{ rescored }} inquir{{ 'y' if rescored == 1 else 'ies' }} re-scored against the new values.</p>{% endif %}
+{% if error %}<p class="alert" role="alert">{{ ui.icon('x') }}<span>{{ error }} <span class="alert__ink">Nothing was saved.</span></span></p>{% endif %}
 
-  <h2>Rules</h2>
-  <label>Minimum acceptable %
-    <input type="number" step="0.01" name="min_acceptable_pct" value="{{ creator.min_acceptable_pct }}"></label>
-  <label>Accepts barter
-    <input type="checkbox" name="accepts_barter" value="true" {{ 'checked' if creator.accepts_barter else '' }}></label>
-  <label>Barter minimum product value (₹)
-    <input type="number" name="barter_min_product_value" value="{{ creator.barter_min_product_value }}"></label>
-  <label>Usage rights default (days)
-    <input type="number" name="usage_rights_default_days" value="{{ creator.usage_rights_default_days }}"></label>
-  <label>Max usage without extra fee (days)
-    <input type="number" name="max_usage_days_without_extra_fee" value="{{ creator.max_usage_days_without_extra_fee }}"></label>
+<section class="panel profile" aria-labelledby="who">
+  <div class="profile__mono" aria-hidden="true">{{ initials }}</div>
+  <div>
+    <h1 id="who">{{ creator.name }} <span class="handle">{{ creator.ig_handle }}</span></h1>
+    <p class="profile__facts"><span>{{ creator.niche|map('capitalize')|join(' & ') }}</span><span>{{ creator.city }}</span><span>{{ creator.languages|join(', ') }}</span></p>
+  </div>
+  <dl class="stats">
+    <div><dt class="stat__label">Followers</dt><dd class="stat__num num">{{ creator.followers|num_in }}</dd></div>
+    <div><dt class="stat__label">Avg reach</dt><dd class="stat__num num">{{ creator.avg_reach|num_in }}</dd></div>
+    <div><dt class="stat__label">Engagement</dt><dd class="stat__num num">{{ creator.engagement_rate }}%</dd></div>
+  </dl>
+</section>
 
-  <button type="submit" class="btn btn-primary">Save &amp; re-score existing inquiries</button>
-</form>
+<div class="grid-3">
+  <form class="panel" method="post" action="/creator/{{ creator.id }}/update">
+    <div class="panel__head"><h2 class="panel__title">Rate card</h2><span class="panel__sub">per deliverable</span></div>
+    <div class="panel__body form-rows">
+      {% for name, label in [('reel', 'Reel'), ('story', 'Story'), ('static_post', 'Static post'), ('carousel', 'Carousel')] %}
+      <div class="form-row"><label class="label" for="r-{{ name }}">{{ label }}</label><div class="input-affix"><span class="input-affix__pre">₹</span><input class="input num" id="r-{{ name }}" name="{{ name }}" value="{{ creator.rate_card[name]|num_in }}" inputmode="numeric"></div></div>
+      {% endfor %}
+      <div class="form-row"><label class="label" for="r-bundle">Bundle discount</label><div class="input-affix"><input class="input num" id="r-bundle" name="bundle_discount_pct" value="{{ creator.rate_card.bundle_discount_pct|pct_num }}" inputmode="decimal"><span class="input-affix__post">%</span></div></div>
+      <p class="help">The bundle discount applies from {{ bundle_min }} deliverables in one booking.</p>
+      <div class="form-foot"><button class="btn btn--primary" type="submit">Save rates</button></div>
+    </div>
+  </form>
 
-<h2>Partners</h2>
-<ul class="partner-list">
-  {% for p in creator.active_partners %}
-    {% set is_expired = p.exclusive and p.exclusivity_end_date and p.exclusivity_end_date <= ref_date %}
-    <li class="{{ 'exclusive-expired' if is_expired else ('exclusive-active' if p.exclusive else '') }}">
-      {{ p.brand }} — {{ p.category|title }}
-      {% if p.exclusive %}
-        — <strong>EXCLUSIVE</strong>
-        {% if p.exclusivity_end_date %}
-          {% set days_left = (p.exclusivity_end_date - ref_date).days %}
-          {% if days_left > 0 %}
-            — {{ days_left }} days remaining
-          {% else %}
-            — expired {{ -days_left }} days ago
-          {% endif %}
-        {% endif %}
-      {% endif %}
-    </li>
-  {% else %}
-    <li>No partners on file.</li>
-  {% endfor %}
-</ul>
+  <form class="panel" method="post" action="/creator/{{ creator.id }}/update">
+    <div class="panel__head"><h2 class="panel__title">Rules</h2><span class="panel__sub">used in every score</span></div>
+    <div class="panel__body form-rows">
+      <div class="form-row"><label class="label" for="u-min">Minimum acceptable</label><div class="input-affix"><input class="input num" id="u-min" name="min_acceptable_pct" value="{{ creator.min_acceptable_pct|pct_num }}" inputmode="decimal"><span class="input-affix__post">% of quote</span></div></div>
+      <div class="form-row"><label class="label" for="u-barter">Accepts barter</label><select class="select" id="u-barter" name="accepts_barter"><option value="yes"{{ ' selected' if creator.accepts_barter }}>Yes</option><option value="no"{{ ' selected' if not creator.accepts_barter }}>No</option></select></div>
+      <div class="form-row"><label class="label" for="u-bmin">Barter minimum product value</label><div class="input-affix"><span class="input-affix__pre">₹</span><input class="input num" id="u-bmin" name="barter_min_product_value" value="{{ creator.barter_min_product_value|num_in }}" inputmode="numeric"></div></div>
+      <div class="form-row"><label class="label" for="u-usage">Usage rights default</label><div class="input-affix"><input class="input num" id="u-usage" name="usage_rights_default_days" value="{{ creator.usage_rights_default_days }}" inputmode="numeric"><span class="input-affix__post">days</span></div></div>
+      <div class="form-row"><label class="label" for="u-max">Max usage without extra fee</label><div class="input-affix"><input class="input num" id="u-max" name="max_usage_days_without_extra_fee" value="{{ creator.max_usage_days_without_extra_fee }}" inputmode="numeric"><span class="input-affix__post">days</span></div></div>
+      <div class="form-foot"><button class="btn btn--primary" type="submit">Save rules</button></div>
+    </div>
+  </form>
 
-<h2>No-go categories</h2>
-<p>{{ creator.no_go_categories|join(', ')|title if creator.no_go_categories else 'None' }}</p>
+  <section class="panel" aria-labelledby="avail-h">
+    <div class="panel__head"><h2 class="panel__title" id="avail-h">Availability</h2><span class="panel__sub">{{ month_label }}</span></div>
+    <div class="panel__body stack">
+      {{ ui.capacity(capacity) }}
+      <form class="form-row" method="post" action="/creator/{{ creator.id }}/update">
+        <label class="label" for="c-max">Monthly capacity</label>
+        <div class="input-affix"><input class="input num" id="c-max" name="max_paid_deals_per_month" value="{{ creator.max_paid_deals_per_month }}" inputmode="numeric"><button class="btn input-affix__post" type="submit">Save</button></div>
+      </form>
+      <div class="blackout">
+        <h3 class="assessment__h">Blackout dates</h3>
+        {% for b in creator.blackout_dates %}
+        <div class="blackout__item">
+          {{ ui.icon('blackout', lg=true) }}
+          <div><p class="blackout__dates">{{ b.start|date_short }}–{{ b.end|date_long }}</p><p class="blackout__why">{{ b.reason|capitalize or 'Unavailable' }}</p></div>
+          <span></span>
+        </div>
+        {% else %}
+        <p class="blackout-none">None set. Inquiries are not checked against any dates.</p>
+        {% endfor %}
+        {% if creator.blackout_dates %}<p class="help">Any inquiry going live in a blackout window gets a Blackout clash flag.</p>{% endif %}
+      </div>
+    </div>
+  </section>
+</div>
 
-<h2>Capacity this month</h2>
-<p>{{ creator.current_booked_this_month }} of {{ creator.max_paid_deals_per_month }} booked
-  {% if creator.current_booked_this_month >= creator.max_paid_deals_per_month %}<strong>(FULL)</strong>{% endif %}
-</p>
+<div class="grid-2">
+  <section class="panel" aria-labelledby="partners-h">
+    <div class="panel__head"><h2 class="panel__title" id="partners-h">Partners</h2><span class="panel__sub">exclusivity blocks the whole category</span></div>
+    <div class="panel__body stack">
+      {% for p in partners %}{{ ui.excl(p) }}{% else %}<p class="blackout-none">No partners on file.</p>{% endfor %}
+    </div>
+  </section>
 
-<h2>Blackout dates</h2>
-{% if creator.blackout_dates %}
-  <ul>
-    {% for b in creator.blackout_dates %}
-      <li>{{ b.start }} to {{ b.end }} — {{ b.reason }}</li>
-    {% endfor %}
-  </ul>
-{% else %}
-  <p>None on file.</p>
-{% endif %}
+  <section class="panel" aria-labelledby="nogo-h">
+    <div class="panel__head"><h2 class="panel__title" id="nogo-h">No-go categories</h2><span class="panel__sub">auto-score 0, flagged No-go</span></div>
+    <div class="panel__body stack">
+      <ul class="nogo">
+        {% for cat in creator.no_go_categories %}
+        <li class="nogo__item">{{ cat|capitalize }} <form method="post" action="/creator/{{ creator.id }}/nogo"><input type="hidden" name="remove" value="{{ cat }}"><button class="nogo__remove" type="submit" aria-label="Remove {{ cat|capitalize }}">×</button></form></li>
+        {% else %}
+        <li class="blackout-none">None on file for {{ creator.name.split()[0] }}.</li>
+        {% endfor %}
+      </ul>
+      <form class="form-row" method="post" action="/creator/{{ creator.id }}/nogo"><label class="visually-hidden" for="nogo-add">Add category</label><input class="input" id="nogo-add" name="add" placeholder="Add a category" required><button class="btn" type="submit">Add</button></form>
+      <p class="help">Agency-wide no-gos also apply: {{ global_no_go|map('capitalize')|join(', ') }}.</p>
+    </div>
+  </section>
+</div>
 
-<h2>Inquiry history</h2>
-<table class="history-table">
-  <thead><tr><th>Brand</th><th>Date</th><th>Score</th><th>Priority</th><th>Outcome</th></tr></thead>
-  <tbody>
-    {% for r in history %}
-      <tr>
-        <td><a href="/inquiry/{{ r.inquiry['id'] }}">{{ r.extraction.brand or '(unknown)' }}</a></td>
-        <td>{{ r.inquiry['received_at'][:10] }}</td>
-        <td>{{ r.assessment.final_score|round(0, 'floor')|int }}</td>
-        <td>{{ r.assessment.priority }}</td>
-        <td>{{ r.assessment.recommended_action|replace('_', ' ')|title }}</td>
-      </tr>
-    {% else %}
-      <tr><td colspan="5">No inquiries yet — click "Scan inboxes" from the queue.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+<section class="panel" aria-labelledby="hist-h">
+  <div class="panel__head"><h2 class="panel__title" id="hist-h">Inquiry history</h2><span class="panel__sub">from the last scan, newest first</span></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th scope="col">Brand</th><th scope="col">Received</th><th scope="col" class="is-num">Score</th><th scope="col" class="is-num">Offered</th><th scope="col">Outcome</th></tr></thead>
+      <tbody>
+        {% for h in history %}
+        <tr>
+          <td><a href="/inquiry/{{ h.id }}">{{ h.brand }}</a></td>
+          <td>{{ h.received|date_long }}</td>
+          <td class="is-num">{{ h.score }}</td>
+          <td class="is-num num{{ ' muted' if h.offer is none }}">{{ h.offer|inr('Not stated') }}</td>
+          <td><span class="outcome outcome--{{ h.outcome[1] }}">{{ h.outcome[0] }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="muted">No inquiries yet — run <a href="/">Scan inboxes</a> from the queue.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
 {% endblock %}
