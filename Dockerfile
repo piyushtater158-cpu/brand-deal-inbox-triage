@@ -18,4 +18,5 @@ ENV DB_PATH=/app/data/app.db
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Shell form so $PORT expands: hosts like Render inject the port to bind to.
+CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
