@@ -44,6 +44,22 @@ python -m venv .venv
 
 (On Windows: `.venv\Scripts\pip` / `.venv\Scripts\uvicorn`.)
 
+## Deploy on Render
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/piyushtater158-cpu/brand-deal-inbox-triage)
+
+`render.yaml` describes one free Docker web service in Singapore. The container binds
+to the `PORT` Render injects. The `OPENROUTER_*` variables are prompted for at deploy
+time; leave them empty and the app runs fully on the rules path, with AI off.
+
+Two free-tier caveats, both expected by design:
+
+- **Spin-down.** The service sleeps after about 15 minutes idle, and the first request
+  after that takes up to a minute while it wakes.
+- **Ephemeral disk.** Every wake or redeploy starts with an empty database. Creators
+  reload from `seed/` on the first request; click **Scan inboxes** to rebuild the
+  queue. The decision log resets too (see "Why the database is rebuildable" below).
+
 ## Where the config is
 
 `config.yaml` at the repo root — every keyword, scoring weight, risk penalty,
@@ -61,12 +77,31 @@ drop this key (the engine falls back to `date.today()` when it's unset).
 ## Verifying it
 
 ```bash
-pytest                           # 48 tests: quote math, extraction regex, AI-off
+pytest                           # 49 tests: quote math, extraction regex, AI-off
                                   # fallbacks, manager edits + live re-score, and
                                   # the full scenario fixture
 python scripts/check_expected.py # standalone AI-off acceptance check, no pytest
                                   # needed — exits 0 on a full match
 ```
+
+Against a running instance (the Docker container, or a deployed URL):
+
+```bash
+python scripts/smoke_test.py [base_url]    # 73 HTTP checks: every screen, filters,
+                                           # edits, decisions, DM intake, config,
+                                           # AI toggle, 404s, concurrent writes, and
+                                           # the expected-results match
+python scripts/browser_test.py [base_url]  # real Edge/Chrome: the HTMX swaps, with
+                                           # every off-host request blocked
+```
+
+`browser_test.py` needs `pip install playwright` (a dev-only dependency; it drives the
+browser already installed, nothing to download). Both scripts change the target's
+state, so point them at a demo instance, not one you're mid-review on.
+
+The container has been verified with no internet access at all (an internal Docker
+network), under Render free-tier limits (512 MB, 0.1 CPU) on an injected `PORT`:
+all 73 smoke checks pass, ready in about 7 seconds, using about 50 MB of memory.
 
 `scripts/check_expected.py` is the brief's "automated test script passes with AI off"
 acceptance test. It re-runs the real pipeline against `seed/demo_inbox.json` and

@@ -12,8 +12,8 @@
 </div>
 
 <div class="summary-grid">
-  <div class="summary-tile"><span class="tile-value">{{ value_p1|round(0,'floor')|int|string }}</span><span class="tile-label">₹ in P1</span></div>
-  <div class="summary-tile"><span class="tile-value">{{ value_p2|round(0,'floor')|int|string }}</span><span class="tile-label">₹ in P2</span></div>
+  <div class="summary-tile"><span class="tile-value">{{ value_p1|inr }}</span><span class="tile-label">Value in play, P1</span></div>
+  <div class="summary-tile"><span class="tile-value">{{ value_p2|inr }}</span><span class="tile-label">Value in play, P2</span></div>
   <div class="summary-tile headline"><span class="tile-value">{{ conflicts_caught }}</span><span class="tile-label">Conflicts caught</span></div>
   <div class="summary-tile"><span class="tile-value">{{ skipped_count }}</span><span class="tile-label">Skipped mail</span></div>
 </div>

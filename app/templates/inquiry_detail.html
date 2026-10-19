@@ -17,7 +17,8 @@
 
   <div class="pane fields-pane">
     <h2>Extracted fields</h2>
-    <form class="field-rows">
+    {# Not a <form>: HTMX posts every input of an enclosing form, and all rows share name="value". #}
+    <div class="field-rows">
       {% macro field_row(name, label, value, type='text') %}
         <div class="field-row">
           <label for="f_{{ name }}">{{ label }}</label>
@@ -57,7 +58,7 @@
       </div>
       {{ field_row('payment_advance_pct', 'Advance (%)', extraction.payment_advance_pct, 'number') }}
       {{ field_row('payment_net_days', 'Net days', extraction.payment_net_days, 'number') }}
-    </form>
+    </div>
   </div>
 
   <div class="pane assessment-pane">

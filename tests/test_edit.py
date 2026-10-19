@@ -77,6 +77,38 @@ def test_bad_edit_shows_error_and_leaves_assessment_unchanged(client):
     assert _debug_row(client, "msg_002")["quote_total"] == 264330.0
 
 
+def test_edit_inputs_are_not_inside_a_form(client):
+    """HTMX posts every input of an enclosing <form>; every edit input is named "value",
+    so a wrapper form makes the server keep the last row's value instead of the edited one.
+    """
+    from html.parser import HTMLParser
+
+    class EditInputsInForms(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.form_depth = 0
+            self.edit_inputs = 0
+            self.inside_form = []
+
+        def handle_starttag(self, tag, attrs):
+            a = dict(attrs)
+            if tag == "form":
+                self.form_depth += 1
+            elif tag == "input" and a.get("hx-post", "").endswith("/edit"):
+                self.edit_inputs += 1
+                if self.form_depth:
+                    self.inside_form.append(a.get("id"))
+
+        def handle_endtag(self, tag):
+            if tag == "form":
+                self.form_depth -= 1
+
+    parser = EditInputsInForms()
+    parser.feed(client.get("/inquiry/msg_002").text)
+    assert parser.edit_inputs >= 10
+    assert parser.inside_form == []
+
+
 def test_unknown_ids_return_404(client):
     assert client.get("/inquiry/nope").status_code == 404
     assert client.get("/creator/nope").status_code == 404

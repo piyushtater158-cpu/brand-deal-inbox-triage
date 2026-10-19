@@ -6,3 +6,4 @@ data/
 *.db
 .env
 .claude/
+scripts/browser_test_inquiry.png

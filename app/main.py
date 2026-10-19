@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import base64
+import uuid
 from pathlib import Path
 
 import yaml
@@ -319,7 +320,7 @@ async def dm_process(
             )
             a = assess(creator, ext, ref_date, raw_text=text, sender_domain="instagram.com")
             import datetime as dt
-            new_inquiry_id = f"dm_{int(dt.datetime.now().timestamp())}"
+            new_inquiry_id = f"dm_{int(dt.datetime.now().timestamp())}_{uuid.uuid4().hex[:6]}"
             db.save_inquiry(
                 conn, inquiry_id=new_inquiry_id, creator_id=creator_id, source="dm",
                 received_at=dt.datetime.now(), sender_name="DM intake", sender_email_or_handle="",
