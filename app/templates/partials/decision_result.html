@@ -1,0 +1,10 @@
+<div id="decision-result" class="decision-result">
+  {% if decision %}
+    <p class="decision-confirmed">
+      Logged: <strong>{{ decision['action']|replace('_', ' ')|title }}</strong> at {{ decision['timestamp'][:19]|replace('T', ' ') }}.
+      {% if decision['action'] in ('accept_and_negotiate', 'counter_offer', 'ask_for_info') %}
+        Reply is copy-ready above.
+      {% endif %}
+    </p>
+  {% endif %}
+</div>

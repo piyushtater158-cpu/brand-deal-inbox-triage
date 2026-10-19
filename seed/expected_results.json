@@ -1,0 +1,502 @@
+{
+  "msg_001": {
+    "scenario": "strong_paid_deal_fully_specified",
+    "creator_id": "aanya_mehra",
+    "brand": "Lumiere Skin Co.",
+    "message_ids": [
+      "msg_001",
+      "msg_015"
+    ],
+    "type": "paid",
+    "flags": [
+      "duplicate"
+    ],
+    "priority": "P1",
+    "final_score": 83.1,
+    "recommended_action": "accept_and_negotiate",
+    "rate_fit_pct": 104.16666666666667,
+    "counter_offer_amount": null,
+    "quote_total": 144000.0
+  },
+  "msg_002": {
+    "scenario": "competitor_conflict_vs_santoor",
+    "creator_id": "aanya_mehra",
+    "brand": "Nivara Soaps",
+    "message_ids": [
+      "msg_002"
+    ],
+    "type": "paid",
+    "flags": [
+      "conflict",
+      "lowball",
+      "risky_payment_terms",
+      "usage_overreach"
+    ],
+    "priority": "P3",
+    "final_score": 20.0,
+    "recommended_action": "decline",
+    "rate_fit_pct": 56.74724775848371,
+    "counter_offer_amount": null,
+    "quote_total": 264330.0
+  },
+  "msg_012": {
+    "scenario": "scam_registration_fee",
+    "creator_id": "aanya_mehra",
+    "brand": null,
+    "message_ids": [
+      "msg_012"
+    ],
+    "type": "spam",
+    "flags": [],
+    "priority": "Ignore",
+    "final_score": 0.0,
+    "recommended_action": "mark_spam",
+    "rate_fit_pct": null,
+    "counter_offer_amount": null,
+    "quote_total": null
+  },
+  "msg_013": {
+    "scenario": "lookalike_domain",
+    "creator_id": "aanya_mehra",
+    "brand": "Santoor",
+    "message_ids": [
+      "msg_013"
+    ],
+    "type": "spam",
+    "flags": [],
+    "priority": "Ignore",
+    "final_score": 0.0,
+    "recommended_action": "mark_spam",
+    "rate_fit_pct": null,
+    "counter_offer_amount": null,
+    "quote_total": null
+  },
+  "msg_018": {
+    "scenario": "hinglish_message",
+    "creator_id": "aanya_mehra",
+    "brand": "Glownest Cosmetics",
+    "message_ids": [
+      "msg_018"
+    ],
+    "type": "paid",
+    "flags": [
+      "lowball",
+      "missing_info"
+    ],
+    "priority": "P2",
+    "final_score": 51.3,
+    "recommended_action": "ask_for_info",
+    "rate_fit_pct": 45.3514739229025,
+    "counter_offer_amount": null,
+    "quote_total": 88200.0
+  },
+  "msg_021": {
+    "scenario": "filler_ordinary_deal",
+    "creator_id": "aanya_mehra",
+    "brand": "Pure Glow Cosmetics",
+    "message_ids": [
+      "msg_021"
+    ],
+    "type": "paid",
+    "flags": [],
+    "priority": "P2",
+    "final_score": 69.2,
+    "recommended_action": "counter_offer",
+    "rate_fit_pct": 83.33333333333334,
+    "counter_offer_amount": 96000,
+    "quote_total": 96000.0
+  },
+  "msg_027": {
+    "scenario": "filler_ordinary_deal",
+    "creator_id": "aanya_mehra",
+    "brand": "Radiance Derma",
+    "message_ids": [
+      "msg_027"
+    ],
+    "type": "paid",
+    "flags": [],
+    "priority": "P1",
+    "final_score": 71.3,
+    "recommended_action": "counter_offer",
+    "rate_fit_pct": 88.78504672897196,
+    "counter_offer_amount": 107000,
+    "quote_total": 107000.0
+  },
+  "msg_003": {
+    "scenario": "paid_slightly_under_rate_and_urgent",
+    "creator_id": "rohan_iyer",
+    "brand": "Fitfuel India",
+    "message_ids": [
+      "msg_003"
+    ],
+    "type": "paid",
+    "flags": [
+      "urgent"
+    ],
+    "priority": "P1",
+    "final_score": 74.7,
+    "recommended_action": "counter_offer",
+    "rate_fit_pct": 85.81235697940504,
+    "counter_offer_amount": 70000,
+    "quote_total": 69920.0
+  },
+  "msg_006": {
+    "scenario": "barter_not_acceptable",
+    "creator_id": "rohan_iyer",
+    "brand": "Gearfit Supplements",
+    "message_ids": [
+      "msg_006"
+    ],
+    "type": "barter",
+    "flags": [
+      "lowball"
+    ],
+    "priority": "P3",
+    "final_score": 34.4,
+    "recommended_action": "counter_offer",
+    "rate_fit_pct": 10.416666666666668,
+    "counter_offer_amount": 48000,
+    "quote_total": 48000.0
+  },
+  "msg_007": {
+    "scenario": "expired_exclusivity_no_longer_conflict",
+    "creator_id": "rohan_iyer",
+    "brand": "Musclemax",
+    "message_ids": [
+      "msg_007"
+    ],
+    "type": "paid",
+    "flags": [],
+    "priority": "P1",
+    "final_score": 73.2,
+    "recommended_action": "accept_and_negotiate",
+    "rate_fit_pct": 113.95511921458625,
+    "counter_offer_amount": null,
+    "quote_total": 114080.0
+  },
+  "msg_022": {
+    "scenario": "filler_ordinary_deal",
+    "creator_id": "rohan_iyer",
+    "brand": "Powerbar Nutrition",
+    "message_ids": [
+      "msg_022"
+    ],
+    "type": "paid",
+    "flags": [],
+    "priority": "P2",
+    "final_score": 68.0,
+    "recommended_action": "accept_and_negotiate",
+    "rate_fit_pct": 100.11441647597255,
+    "counter_offer_amount": null,
+    "quote_total": 69920.0
+  },
+  "msg_029": {
+    "scenario": "filler_ordinary_deal",
+    "creator_id": "rohan_iyer",
+    "brand": "Corestrength Gear",
+    "message_ids": [
+      "msg_029"
+    ],
+    "type": "paid",
+    "flags": [],
+    "priority": "P2",
+    "final_score": 63.8,
+    "recommended_action": "counter_offer",
+    "rate_fit_pct": 88.70967741935483,
+    "counter_offer_amount": 62000,
+    "quote_total": 62000.0
+  },
+  "msg_004": {
+    "scenario": "lowball_under_50pct",
+    "creator_id": "meera_nair",
+    "brand": "Quickbite Foods",
+    "message_ids": [
+      "msg_004"
+    ],
+    "type": "paid",
+    "flags": [
+      "capacity_full",
+      "lowball"
+    ],
+    "priority": "P2",
+    "final_score": 53.0,
+    "recommended_action": "decline",
+    "rate_fit_pct": 40.0,
+    "counter_offer_amount": null,
+    "quote_total": 20000.0
+  },
+  "msg_011": {
+    "scenario": "risky_payment_terms",
+    "creator_id": "meera_nair",
+    "brand": "Snackworks India",
+    "message_ids": [
+      "msg_011"
+    ],
+    "type": "paid",
+    "flags": [
+      "capacity_full",
+      "risky_payment_terms"
+    ],
+    "priority": "P2",
+    "final_score": 65.5,
+    "recommended_action": "accept_and_negotiate",
+    "rate_fit_pct": 100.0,
+    "counter_offer_amount": null,
+    "quote_total": 55000.0
+  },
+  "msg_016": {
+    "scenario": "capacity_full",
+    "creator_id": "meera_nair",
+    "brand": "Homechef Kitchenware",
+    "message_ids": [
+      "msg_016"
+    ],
+    "type": "paid",
+    "flags": [
+      "capacity_full"
+    ],
+    "priority": "P2",
+    "final_score": 66.2,
+    "recommended_action": "counter_offer",
+    "rate_fit_pct": 95.23809523809523,
+    "counter_offer_amount": 63000,
+    "quote_total": 63000.0
+  },
+  "msg_019": {
+    "scenario": "non_deal_with_keyword",
+    "creator_id": "meera_nair",
+    "brand": null,
+    "message_ids": [
+      "msg_019"
+    ],
+    "type": "not_a_deal",
+    "flags": [],
+    "priority": "Ignore",
+    "final_score": 0.0,
+    "recommended_action": "decline",
+    "rate_fit_pct": null,
+    "counter_offer_amount": null,
+    "quote_total": null
+  },
+  "msg_023": {
+    "scenario": "filler_ordinary_deal",
+    "creator_id": "meera_nair",
+    "brand": "Kochi Spice Co.",
+    "message_ids": [
+      "msg_023"
+    ],
+    "type": "paid",
+    "flags": [
+      "capacity_full"
+    ],
+    "priority": "P1",
+    "final_score": 83.0,
+    "recommended_action": "accept_and_negotiate",
+    "rate_fit_pct": 200.0,
+    "counter_offer_amount": null,
+    "quote_total": 20000.0
+  },
+  "msg_028": {
+    "scenario": "filler_ordinary_deal",
+    "creator_id": "meera_nair",
+    "brand": "Urban Kitchen Co.",
+    "message_ids": [
+      "msg_028"
+    ],
+    "type": "paid",
+    "flags": [
+      "capacity_full"
+    ],
+    "priority": "P2",
+    "final_score": 62.6,
+    "recommended_action": "counter_offer",
+    "rate_fit_pct": 85.71428571428571,
+    "counter_offer_amount": 35000,
+    "quote_total": 35000.0
+  },
+  "msg_008": {
+    "scenario": "no_go_betting",
+    "creator_id": "kabir_shah",
+    "brand": "Betking11",
+    "message_ids": [
+      "msg_008"
+    ],
+    "type": "paid",
+    "flags": [
+      "no_go"
+    ],
+    "priority": "Ignore",
+    "final_score": 0.0,
+    "recommended_action": "decline",
+    "rate_fit_pct": 142.85714285714286,
+    "counter_offer_amount": null,
+    "quote_total": 140000.0
+  },
+  "msg_010": {
+    "scenario": "usage_overreach",
+    "creator_id": "kabir_shah",
+    "brand": "Voltedge Electronics",
+    "message_ids": [
+      "msg_010"
+    ],
+    "type": "paid",
+    "flags": [
+      "lowball",
+      "usage_overreach"
+    ],
+    "priority": "P3",
+    "final_score": 33.1,
+    "recommended_action": "decline",
+    "rate_fit_pct": 0.3917405628653764,
+    "counter_offer_amount": null,
+    "quote_total": 38290648.0
+  },
+  "msg_017": {
+    "scenario": "blackout_clash",
+    "creator_id": "kabir_shah",
+    "brand": "Nexacharge",
+    "message_ids": [
+      "msg_017"
+    ],
+    "type": "paid",
+    "flags": [
+      "blackout_clash"
+    ],
+    "priority": "P2",
+    "final_score": 67.5,
+    "recommended_action": "counter_offer",
+    "rate_fit_pct": 78.70370370370371,
+    "counter_offer_amount": 108000,
+    "quote_total": 108000.0
+  },
+  "msg_020": {
+    "scenario": "agency_on_behalf_of_brand",
+    "creator_id": "kabir_shah",
+    "brand": "Boat",
+    "message_ids": [
+      "msg_020"
+    ],
+    "type": "paid",
+    "flags": [],
+    "priority": "P1",
+    "final_score": 73.8,
+    "recommended_action": "accept_and_negotiate",
+    "rate_fit_pct": 102.14504596527067,
+    "counter_offer_amount": null,
+    "quote_total": 156640.0
+  },
+  "msg_024": {
+    "scenario": "filler_ordinary_deal",
+    "creator_id": "kabir_shah",
+    "brand": "Technova Gadgets",
+    "message_ids": [
+      "msg_024"
+    ],
+    "type": "paid",
+    "flags": [],
+    "priority": "P2",
+    "final_score": 68.6,
+    "recommended_action": "accept_and_negotiate",
+    "rate_fit_pct": 101.67464114832536,
+    "counter_offer_amount": null,
+    "quote_total": 167200.0
+  },
+  "msg_030": {
+    "scenario": "filler_ordinary_deal",
+    "creator_id": "kabir_shah",
+    "brand": "Chipworks Semiconductors",
+    "message_ids": [
+      "msg_030"
+    ],
+    "type": "paid",
+    "flags": [],
+    "priority": "P1",
+    "final_score": 78.2,
+    "recommended_action": "accept_and_negotiate",
+    "rate_fit_pct": 107.14285714285714,
+    "counter_offer_amount": null,
+    "quote_total": 70000.0
+  },
+  "msg_005": {
+    "scenario": "barter_acceptable",
+    "creator_id": "tara_dsouza",
+    "brand": "Zephyr Travel Co.",
+    "message_ids": [
+      "msg_005"
+    ],
+    "type": "barter",
+    "flags": [],
+    "priority": "P1",
+    "final_score": 83.0,
+    "recommended_action": "accept_and_negotiate",
+    "rate_fit_pct": 169.23076923076923,
+    "counter_offer_amount": null,
+    "quote_total": 13000.0
+  },
+  "msg_009": {
+    "scenario": "missing_budget_and_dates",
+    "creator_id": "tara_dsouza",
+    "brand": "Wanderluxe Stays",
+    "message_ids": [
+      "msg_009"
+    ],
+    "type": "paid",
+    "flags": [
+      "missing_info"
+    ],
+    "priority": "P3",
+    "final_score": 26.8,
+    "recommended_action": "ask_for_info",
+    "rate_fit_pct": null,
+    "counter_offer_amount": null,
+    "quote_total": 45000.0
+  },
+  "msg_025": {
+    "scenario": "filler_ordinary_deal",
+    "creator_id": "tara_dsouza",
+    "brand": "Coastal Breeze Resorts",
+    "message_ids": [
+      "msg_025"
+    ],
+    "type": "paid",
+    "flags": [],
+    "priority": "P1",
+    "final_score": 80.0,
+    "recommended_action": "accept_and_negotiate",
+    "rate_fit_pct": 112.06896551724137,
+    "counter_offer_amount": null,
+    "quote_total": 58000.0
+  },
+  "msg_026": {
+    "scenario": "filler_ordinary_deal",
+    "creator_id": "tara_dsouza",
+    "brand": "Everest Gear Co.",
+    "message_ids": [
+      "msg_026"
+    ],
+    "type": "paid",
+    "flags": [],
+    "priority": "P2",
+    "final_score": 54.3,
+    "recommended_action": "counter_offer",
+    "rate_fit_pct": 83.33333333333334,
+    "counter_offer_amount": 24000,
+    "quote_total": 24000.0
+  },
+  "msg_031": {
+    "scenario": "filler_ordinary_deal",
+    "creator_id": "tara_dsouza",
+    "brand": "Highland Trails Co.",
+    "message_ids": [
+      "msg_031"
+    ],
+    "type": "paid",
+    "flags": [],
+    "priority": "P2",
+    "final_score": 65.2,
+    "recommended_action": "counter_offer",
+    "rate_fit_pct": 72.46376811594203,
+    "counter_offer_amount": 69000,
+    "quote_total": 69000.0
+  }
+}

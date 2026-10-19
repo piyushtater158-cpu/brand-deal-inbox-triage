@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Triage Queue — Brand Deal Inbox Triage{% endblock %}
+{% block content %}
+<div class="queue-header">
+  <h1>Triage Queue</h1>
+  <form method="post" action="/scan">
+    <button type="submit" class="btn btn-primary">Scan inboxes</button>
+  </form>
+</div>
+
+<div id="skipped-notice" class="skipped-notice">
+  {% if skipped_count %}
+    {{ skipped_count }} message{{ 's' if skipped_count != 1 else '' }} skipped — no brand keywords matched.
+    <details>
+      <summary>View list</summary>
+      <ul>
+        {% for s in skipped %}
+          <li>{{ s['subject'] or '(no subject — DM)' }} — {{ s['received_at'][:10] }} — {{ s['reason'] }}</li>
+        {% endfor %}
+      </ul>
+    </details>
+  {% else %}
+    No mail scanned yet, or nothing was skipped.
+  {% endif %}
+</div>
+
+<form class="filter-bar" hx-get="/partials/queue-list" hx-target="#queue-list" hx-swap="outerHTML" hx-trigger="change">
+  <select name="creator">
+    <option value="">All creators</option>
+    {% for c in creators %}
+      <option value="{{ c.id }}" {{ 'selected' if filters.creator == c.id else '' }}>{{ c.name }}</option>
+    {% endfor %}
+  </select>
+  <select name="type">
+    <option value="">All types</option>
+    {% for t in ["paid", "barter", "hybrid", "spam", "not_a_deal"] %}
+      <option value="{{ t }}" {{ 'selected' if filters.type == t else '' }}>{{ t }}</option>
+    {% endfor %}
+  </select>
+  <select name="flag">
+    <option value="">All flags</option>
+    {% for f in ["conflict", "no_go", "lowball", "missing_info", "duplicate", "urgent", "capacity_full", "blackout_clash", "usage_overreach", "risky_payment_terms", "suspicious_sender"] %}
+      <option value="{{ f }}" {{ 'selected' if filters.flag == f else '' }}>{{ f }}</option>
+    {% endfor %}
+  </select>
+  <select name="priority">
+    <option value="">All priorities</option>
+    {% for p in ["P1", "P2", "P3", "Ignore"] %}
+      <option value="{{ p }}" {{ 'selected' if filters.priority == p else '' }}>{{ p }}</option>
+    {% endfor %}
+  </select>
+  <noscript><button type="submit" class="btn">Filter</button></noscript>
+</form>
+
+{% include "partials/queue_list.html" %}
+{% endblock %}

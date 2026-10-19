@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}DM Intake — Brand Deal Inbox Triage{% endblock %}
+{% block content %}
+<h1>Instagram DM Intake</h1>
+<form method="post" action="/dm/process" enctype="multipart/form-data" class="dm-intake-form">
+  <label>Creator
+    <select name="creator_id" required>
+      {% for c in creators %}<option value="{{ c.id }}">{{ c.name }} ({{ c.ig_handle }})</option>{% endfor %}
+    </select>
+  </label>
+
+  <label>Paste DM text
+    <textarea name="dm_text" rows="6" placeholder="hi ma'am, humein aapke saath ek collab karna hai..."></textarea>
+  </label>
+
+  {% if ai_on %}
+    <label>Or upload a screenshot
+      <input type="file" name="screenshot" accept="image/*">
+    </label>
+  {% else %}
+    <p class="ai-off-note">
+      Screenshot reading needs AI — currently off. Paste the DM text above instead; that
+      still works end to end.
+    </p>
+  {% endif %}
+
+  <button type="submit" class="btn btn-primary">Process</button>
+</form>
+
+{% if preview %}
+  <h2>Extracted preview</h2>
+  <p>Brand: {{ preview.extraction.brand or '(not identified)' }}</p>
+  <p>Type: {{ preview.assessment.type }} — Priority: {{ preview.assessment.priority }}</p>
+{% endif %}
+{% endblock %}

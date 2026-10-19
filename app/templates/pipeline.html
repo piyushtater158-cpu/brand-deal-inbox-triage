@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Pipeline Summary — Brand Deal Inbox Triage{% endblock %}
+{% block content %}
+<h1>Pipeline Summary</h1>
+<p class="subtitle">Agency head view — read only.</p>
+
+<div class="summary-grid">
+  <div class="summary-tile"><span class="tile-value">{{ counts.P1 }}</span><span class="tile-label">P1</span></div>
+  <div class="summary-tile"><span class="tile-value">{{ counts.P2 }}</span><span class="tile-label">P2</span></div>
+  <div class="summary-tile"><span class="tile-value">{{ counts.P3 }}</span><span class="tile-label">P3</span></div>
+  <div class="summary-tile"><span class="tile-value">{{ counts.Ignore }}</span><span class="tile-label">Ignore / spam</span></div>
+</div>
+
+<div class="summary-grid">
+  <div class="summary-tile"><span class="tile-value">{{ value_p1|round(0,'floor')|int|string }}</span><span class="tile-label">₹ in P1</span></div>
+  <div class="summary-tile"><span class="tile-value">{{ value_p2|round(0,'floor')|int|string }}</span><span class="tile-label">₹ in P2</span></div>
+  <div class="summary-tile headline"><span class="tile-value">{{ conflicts_caught }}</span><span class="tile-label">Conflicts caught</span></div>
+  <div class="summary-tile"><span class="tile-value">{{ skipped_count }}</span><span class="tile-label">Skipped mail</span></div>
+</div>
+
+<h2>Deals per creator</h2>
+<table class="history-table">
+  <thead><tr><th>Creator</th><th>Inquiries</th></tr></thead>
+  <tbody>
+    {% for creator_id, count in deals_per_creator.items() %}
+      <tr><td><a href="/creator/{{ creator_id }}">{{ creators[creator_id].name }}</a></td><td>{{ count }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Decision log</h2>
+<table class="history-table">
+  <thead><tr><th>Timestamp</th><th>Inquiry</th><th>Action</th><th>Edited?</th></tr></thead>
+  <tbody>
+    {% for d in decisions %}
+      <tr>
+        <td>{{ d['timestamp'][:19]|replace('T', ' ') }}</td>
+        <td><a href="/inquiry/{{ d['inquiry_id'] }}">{{ d['inquiry_id'] }}</a></td>
+        <td>{{ d['action']|replace('_', ' ')|title }}</td>
+        <td>{{ 'yes' if d['edited_reply'] else 'no' }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4">No decisions logged yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

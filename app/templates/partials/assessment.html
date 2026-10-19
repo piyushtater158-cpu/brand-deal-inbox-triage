@@ -1,0 +1,85 @@
+<div id="assessment" class="assessment">
+  {% if edit_error %}
+    <p class="edit-error" role="alert">{{ edit_error }}</p>
+  {% endif %}
+  <div class="assessment-headline">
+    <span class="score">{{ assessment.final_score|round(0, 'floor')|int }}</span>
+    <span class="priority-badge priority-{{ assessment.priority|lower }}">{{ assessment.priority }}</span>
+    <span class="type-badge type-{{ assessment.type }}">{{ assessment.type|replace('_', ' ')|title }}</span>
+  </div>
+
+  {% if assessment.flags %}
+  <div class="flag-list">
+    {% for f in assessment.flags %}
+      <span class="flag-chip flag-{{ f }}">{{ f|replace('_', ' ')|title }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <p class="reason">{{ assessment.reason }}</p>
+
+  {% if 'conflict' in assessment.flags %}
+    <p class="cap-note">Score capped at 20 — a conflict overrides everything else below.</p>
+  {% endif %}
+
+  {% if assessment.quote %}
+  <table class="quote-breakdown">
+    <caption>Quote breakdown</caption>
+    <tr><td>Base ({{ assessment.quote.deliverable_count }} deliverables)</td><td>{{ assessment.quote.base|inr }}</td></tr>
+    {% if assessment.quote.bundle_discount_applied %}
+      <tr><td>Bundle discount (−{{ (assessment.quote.bundle_discount_pct * 100)|round|int }}%)</td>
+          <td>−{{ (assessment.quote.base - assessment.quote.after_discount)|inr }}</td></tr>
+      <tr><td>Subtotal</td><td>{{ assessment.quote.after_discount|inr }}</td></tr>
+    {% endif %}
+    {% if assessment.quote.usage_extra_blocks > 0 %}
+      <tr><td>Usage fee (+{{ (assessment.quote.usage_fee_pct * 100)|round|int }}%, {{ assessment.quote.usage_extra_blocks }} extra 30-day block{{ 's' if assessment.quote.usage_extra_blocks != 1 else '' }})</td>
+          <td>+{{ assessment.quote.usage_fee_amount|inr }}</td></tr>
+    {% endif %}
+    {% if assessment.quote.whitelisting_fee_amount > 0 %}
+      <tr><td>Whitelisting fee (+{{ (assessment.quote.whitelisting_fee_pct * 100)|round|int }}%)</td>
+          <td>+{{ assessment.quote.whitelisting_fee_amount|inr }}</td></tr>
+    {% endif %}
+    {% if assessment.quote.exclusivity_fee_amount > 0 %}
+      <tr><td>Exclusivity fee (+{{ (assessment.quote.exclusivity_fee_pct * 100)|round|int }}%)</td>
+          <td>+{{ assessment.quote.exclusivity_fee_amount|inr }}</td></tr>
+    {% endif %}
+    <tr class="quote-total"><td><strong>Total</strong></td><td><strong>{{ assessment.quote.total|inr }}</strong></td></tr>
+  </table>
+  {% if assessment.rate_fit_pct is not none %}
+    <p class="rate-fit">Rate fit: {{ assessment.rate_fit_pct|round(0, 'floor')|int }}% of quote</p>
+  {% endif %}
+  {% endif %}
+
+  <p class="recommended-action">
+    Recommended: <strong>{{ assessment.recommended_action|replace('_', ' ')|title }}</strong>
+    {% if assessment.counter_offer_amount %}
+      — counter at {{ assessment.counter_offer_amount|inr }}
+    {% endif %}
+  </p>
+
+  {% if assessment.missing_fields %}
+    <p class="missing-fields">Missing: {{ assessment.missing_fields|join(', ') }}</p>
+  {% endif %}
+
+  <form hx-post="/inquiry/{{ inquiry['id'] }}/reextract" hx-target="#assessment" hx-swap="outerHTML" class="reextract-form">
+    <button type="submit" class="btn btn-small">Re-extract with AI off</button>
+  </form>
+
+  <form class="action-group" hx-post="/inquiry/{{ inquiry['id'] }}/decision" hx-target="#decision-result" hx-swap="outerHTML">
+    <textarea name="reply_text" class="reply-draft" rows="6">{{ reply_draft }}</textarea>
+    <div class="action-buttons">
+      <button type="submit" name="action" value="accept_and_negotiate"
+        class="btn {{ 'btn-primary' if assessment.recommended_action == 'accept_and_negotiate' else '' }}">Approve &amp; copy</button>
+      <button type="submit" name="action" value="counter_offer"
+        class="btn {{ 'btn-primary' if assessment.recommended_action == 'counter_offer' else '' }}">Counter-offer</button>
+      <button type="submit" name="action" value="ask_for_info"
+        class="btn {{ 'btn-primary' if assessment.recommended_action == 'ask_for_info' else '' }}">Ask for info</button>
+      <button type="submit" name="action" value="decline"
+        class="btn {{ 'btn-primary' if assessment.recommended_action == 'decline' else '' }}">Decline</button>
+      <button type="submit" name="action" value="mark_spam"
+        class="btn {{ 'btn-primary' if assessment.recommended_action == 'mark_spam' else '' }}">Mark spam</button>
+    </div>
+  </form>
+
+  {% include "partials/decision_result.html" %}
+</div>

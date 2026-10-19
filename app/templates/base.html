@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Brand Deal Inbox Triage{% endblock %}</title>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="sample-data-banner">SAMPLE DATA — every creator, brand and message in this app is synthetic</div>
+  <header class="chrome">
+    <div class="chrome-left">
+      <a href="/" class="brand-name">Brand Deal Inbox Triage</a>
+      <nav>
+        <a href="/">Queue</a>
+        <a href="/dm">DM Intake</a>
+        <a href="/pipeline">Pipeline</a>
+        <a href="/config">Config</a>
+      </nav>
+    </div>
+    <form method="post" action="/settings/ai-toggle" class="ai-toggle-form">
+      <input type="hidden" name="enabled" value="{{ 'false' if ai_on else 'true' }}">
+      <button type="submit" class="ai-toggle {{ 'on' if ai_on else 'off' }}">
+        AI {{ 'ON' if ai_on else 'OFF' }}
+      </button>
+    </form>
+  </header>
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

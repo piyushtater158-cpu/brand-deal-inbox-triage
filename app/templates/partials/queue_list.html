@@ -1,0 +1,38 @@
+<div id="queue-list" class="queue-list">
+  {% if rows %}
+    {% for r in rows %}
+      {% set a = r.assessment %}
+      {% set e = r.extraction %}
+      {% set inq = r.inquiry %}
+      <a href="/inquiry/{{ inq['id'] }}" class="queue-card priority-{{ a.priority|lower }}">
+        <div class="queue-card-top">
+          <span class="creator-name">{{ inq['creator_name'] }} <span class="handle">{{ inq['creator_handle'] }}</span></span>
+          <span class="priority-badge priority-{{ a.priority|lower }}">{{ a.priority }}</span>
+        </div>
+        <div class="queue-card-brand">{{ e.brand or '(brand not identified)' }}</div>
+        <div class="queue-card-budget">
+          {% if a.type == 'barter' %}
+            Barter · product value {{ (e.product_value)|inr }} vs {{ (a.quote.total if a.quote else None)|inr }} quote
+          {% elif e.budget_amount %}
+            {{ e.budget_amount|inr }} offered vs {{ (a.quote.total if a.quote else None)|inr }} quote
+          {% else %}
+            Budget not stated
+          {% endif %}
+        </div>
+        <div class="deliverables">
+          {% for d in e.deliverables %}<span class="deliverable-pill">{{ d.count }} × {{ d.type|replace('_', ' ')|title }}</span>{% endfor %}
+        </div>
+        <div class="queue-card-score">
+          <span class="type-badge type-{{ a.type }}">{{ a.type|replace('_', ' ')|title }}</span>
+          <span class="score">{{ a.final_score|round(0, 'floor')|int }}</span>
+          {% for f in a.flags %}<span class="flag-chip flag-{{ f }}">{{ f|replace('_', ' ')|title }}</span>{% endfor %}
+        </div>
+        <div class="queue-card-reason">{{ a.reason }}</div>
+      </a>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state">
+      No inquiries match these filters. <a href="/">Clear filters</a>, or click "Scan inboxes" if you haven't yet.
+    </div>
+  {% endif %}
+</div>

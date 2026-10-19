@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Config — Brand Deal Inbox Triage{% endblock %}
+{% block content %}
+<h1>Config</h1>
+<p class="subtitle">
+  Every threshold, weight, fee, keyword and spam pattern the engine uses. Nothing here
+  is hardcoded in Python — edit below and every inquiry recomputes on next scan or edit.
+</p>
+
+<div class="config-summary">
+  <h2>Scoring weights</h2>
+  <p>Rate fit {{ cfg.scoring_weights.rate_fit }} · Brand fit {{ cfg.scoring_weights.brand_fit }} ·
+     Urgency {{ cfg.scoring_weights.urgency }} · Completeness {{ cfg.scoring_weights.completeness }}</p>
+
+  <h2>Risk penalties</h2>
+  <p>Risky payment terms {{ cfg.risk_penalty.risky_payment_terms }} · Usage overreach {{ cfg.risk_penalty.usage_overreach }} ·
+     Suspicious sender {{ cfg.risk_penalty.suspicious_sender }} ·
+     Capacity full {{ cfg.risk_penalty.capacity_full }} · Blackout clash {{ cfg.risk_penalty.blackout_clash }}</p>
+
+  <h2>Thresholds</h2>
+  <p>Priority bands: P1 ≥{{ cfg.priority_bands.p1_min }}, P2 ≥{{ cfg.priority_bands.p2_min }}, P3 ≥{{ cfg.priority_bands.p3_min }} ·
+     Duplicate window {{ cfg.duplicate_window_days }} days · Reference date {{ cfg.reference_date }}</p>
+
+  <h2>Fees</h2>
+  <p>Usage +{{ (cfg.usage_fee_pct_per_30_days * 100)|round|int }}%/30 days ·
+     Whitelisting +{{ (cfg.whitelisting_fee_pct * 100)|round|int }}% ·
+     Exclusivity +{{ (cfg.exclusivity_fee_pct * 100)|round|int }}%</p>
+
+  <h2>Keywords</h2>
+  <p>{{ cfg.keywords|join(', ') }}</p>
+
+  <h2>Global no-go categories</h2>
+  <p>{{ cfg.global_no_go_categories|join(', ')|title }}</p>
+</div>
+
+{% if error %}
+  <p class="config-error">Validation failed — nothing was saved: {{ error }}</p>
+{% endif %}
+
+<form method="post" action="/config/update" class="config-editor">
+  <h2>Full config (YAML, pydantic-validated on save)</h2>
+  <textarea name="raw_yaml" rows="30" class="config-textarea">{{ raw_yaml or cfg|tojson(indent=2) }}</textarea>
+  <button type="submit" class="btn btn-primary">Validate &amp; save</button>
+</form>
+{% endblock %}

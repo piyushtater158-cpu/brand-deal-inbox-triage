@@ -1,0 +1,232 @@
+# Brand Deal Inbox Triage — config
+#
+# Every threshold, weight, fee, keyword and spam pattern the engine uses lives here.
+# Nothing in app/*.py hardcodes a number that could plausibly change. Edit this file
+# (or /config in the UI) and every inquiry recomputes against the new values.
+
+# Frozen so expected_results.json and the Hinglish/urgency scenarios never drift as
+# real time passes. date.today() is only the fallback when this is unset.
+reference_date: "2026-10-19"
+
+# -----------------------------------------------------------------------------------
+# Inbox scanning
+# -----------------------------------------------------------------------------------
+keywords:
+  - collab
+  - collaboration
+  - sponsorship
+  - sponsored
+  - paid partnership
+  - campaign
+  - brand deal
+  - barter
+  - pr package
+  - ambassador
+  - promotion
+  - deliverables
+  - rate card
+  - commercials
+  - influencer
+
+# -----------------------------------------------------------------------------------
+# Scoring weights (Section 7 of the brief) — final_score formula:
+#   45 * min(rate_fit, 1.2)/1.2 + 25*brand_fit + 15*urgency + 15*completeness - risk_penalty
+# -----------------------------------------------------------------------------------
+scoring_weights:
+  rate_fit: 45
+  brand_fit: 25
+  urgency: 15
+  completeness: 15
+
+# Rate-fit cap used in the formula above (rate_fit is clamped to this before weighting,
+# so a wildly over-rate-card offer doesn't blow out the score).
+rate_fit_cap: 1.2
+
+risk_penalty:
+  risky_payment_terms: 10
+  usage_overreach: 5
+  suspicious_sender: 15
+  # capacity_full and blackout_clash are NOT in the brief's risk_penalty enumeration
+  # (section 7 lists exactly three values). They change recommended_action and reply
+  # text, never the score. Kept at 0 here, not omitted, so they stay tunable without
+  # touching score.py and so their absence from the formula is visible, not implicit.
+  capacity_full: 0
+  blackout_clash: 0
+
+priority_bands:
+  p1_min: 70
+  p2_min: 40
+  p3_min: 20
+  # below p3_min, or type == spam -> Ignore
+
+# -----------------------------------------------------------------------------------
+# Rate-fit thresholds
+# -----------------------------------------------------------------------------------
+min_acceptable_pct_default: 0.70   # used only if a creator doesn't set their own
+lowball_pct: 0.70                  # rate_fit below the creator's min_acceptable_% -> lowball
+
+# -----------------------------------------------------------------------------------
+# Quote math (Premise 3) — order of operations:
+#   base = sum(rate_card[type] * count)
+#   if total deliverable count >= bundle_discount_min_deliverables:
+#       base *= (1 - bundle_discount)       [bundle_discount is per-creator]
+#   surcharge_multiplier = 1 + usage_pct + whitelist_pct + exclusivity_pct
+#   quoted_price = base * surcharge_multiplier
+# -----------------------------------------------------------------------------------
+bundle_discount_min_deliverables: 3
+
+usage_fee_pct_per_30_days: 0.20     # +20% per extra 30-day block (ceiling) beyond the
+                                     # creator's max_usage_days_without_extra_fee
+whitelisting_fee_pct: 0.25
+exclusivity_fee_pct: 0.30
+
+counter_offer_round_to: 1000        # counter-offer rounds to the nearest ₹1,000
+
+# -----------------------------------------------------------------------------------
+# Brand fit (Premise 5) — brief specifies "+/0/-", consumed here as 0-1.
+# -----------------------------------------------------------------------------------
+brand_fit_scores:
+  in_category: 0.8
+  adjacent: 0.5
+  unknown: 0.4
+  unrelated: 0.2
+  known_brand_bonus: 0.2   # added when brand is in known_brands, then clamped to 1.0
+
+# Adjacency map: category -> list of categories considered "adjacent" (half credit),
+# anything not listed and not an exact match is "unrelated".
+category_adjacency:
+  beauty: [personal care, skincare, fashion]
+  skincare: [beauty, personal care]
+  personal care: [beauty, skincare]
+  fitness: [nutrition, sportswear, health]
+  nutrition: [fitness, health]
+  food: [nutrition, kitchenware]
+  tech: [gadgets, software, gaming]
+  travel: [hospitality, luggage, fashion]
+
+# Brands a reviewer would recognize as credible, regardless of category match.
+# (Assignment: verify these against real rate-card sources before finalizing numbers.)
+known_brands:
+  - santoor
+  - nivea
+  - mamaearth
+  - the whole truth
+  - cult.fit
+  - boat
+  - noise
+  - decathlon
+  - makemytrip
+  - zomato
+
+# Brand -> category lookup, used by the AI-off fallback for brand_category inference.
+brand_category_lookup:
+  santoor: personal care
+  nivara soaps: personal care
+  nivea: personal care
+  lumiere skin co.: skincare
+  glowroot ayurveda: skincare
+  pure glow cosmetics: skincare
+  radiance derma: skincare
+  glownest cosmetics: skincare
+  fitfuel india: nutrition
+  ironcore protein: nutrition
+  musclemax: nutrition
+  gearfit supplements: nutrition
+  powerbar nutrition: nutrition
+  corestrength gear: sportswear
+  betking11: betting
+  luckyspin casino: betting
+  cryptorise exchange: crypto
+  zephyr travel co.: travel
+  wanderluxe stays: travel
+  coastal breeze resorts: travel
+  highland trails co.: travel
+  everest gear co.: outdoor gear
+  tastybite snacks: food
+  quickbite foods: food
+  snackworks india: food
+  kochi spice co.: food
+  homechef kitchenware: kitchenware
+  urban kitchen co.: kitchenware
+  kabirbuilds gear: tech
+  voltedge electronics: tech
+  nexacharge: tech
+  technova gadgets: gadgets
+  chipworks semiconductors: tech
+  boat: gadgets
+
+# -----------------------------------------------------------------------------------
+# Urgency (days until response_deadline, or go_live_date if no deadline given)
+# -----------------------------------------------------------------------------------
+urgency_days_high: 2      # <= 2 days -> urgency score 1.0, Urgent flag
+urgency_days_medium: 7     # <= 7 days -> urgency score 0.6
+# beyond urgency_days_medium -> urgency score 0.2 (never 0: a dated deal is still live)
+
+# Phrases that mean "we'll pay you after we see results" — risky_payment_terms also
+# fires on these even when advance%/net-days aren't both stated.
+risky_payment_phrases:
+  - "pay after results"
+  - "pay after delivery"
+  - "pay on completion"
+  - "payment after campaign ends"
+
+# -----------------------------------------------------------------------------------
+# Duplicate detection
+# -----------------------------------------------------------------------------------
+duplicate_window_days: 14
+
+# -----------------------------------------------------------------------------------
+# No-go categories apply agency-wide in addition to each creator's own no_go_categories
+# -----------------------------------------------------------------------------------
+global_no_go_categories:
+  - betting
+  - crypto
+  - tobacco
+  - fairness creams
+  - forex
+
+# -----------------------------------------------------------------------------------
+# Spam / scam detection (AI-off hard patterns)
+# -----------------------------------------------------------------------------------
+spam_patterns:
+  pay_to_join_phrases:
+    - "registration fee"
+    - "joining fee"
+    - "pay to join"
+    - "processing charge"
+    - "security deposit"
+  crypto_forex_terms:
+    - crypto
+    - bitcoin
+    - forex
+    - "trading signal"
+    - "investment scheme"
+  shortened_link_domains:
+    - bit.ly
+    - tinyurl.com
+    - t.co
+    - cutt.ly
+    - rb.gy
+  # edit distance <= this vs a known_brands domain -> lookalike domain
+  lookalike_domain_max_edit_distance: 2
+  known_brand_domains:
+    santoor: santoor.in
+    nivea: nivea.in
+    mamaearth: mamaearth.in
+  # free-mail providers carrying a big brand name in the display name/subject are
+  # suspicious (suspicious_sender flag, not necessarily spam type on their own)
+  free_mail_domains:
+    - gmail.com
+    - yahoo.com
+    - outlook.com
+    - rediffmail.com
+    - hotmail.com
+
+# -----------------------------------------------------------------------------------
+# AI
+# -----------------------------------------------------------------------------------
+ai:
+  model_env_var: OPENROUTER_MODEL
+  vision_model_env_var: OPENROUTER_VISION_MODEL
+  api_key_env_var: OPENROUTER_API_KEY
+  max_retries: 1

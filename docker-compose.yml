@@ -1,0 +1,14 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-}
+      - OPENROUTER_VISION_MODEL=${OPENROUTER_VISION_MODEL:-}
+    volumes:
+      - app_data:/app/data
+
+volumes:
+  app_data:
