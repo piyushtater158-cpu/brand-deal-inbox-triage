@@ -7,7 +7,13 @@
     <h1>Creators</h1>
     <p class="page-head__meta">{{ rows|length }} creators on the Kalakaaar roster · rate cards, rules and partners per creator</p>
   </div>
+  <div class="page-head__actions">
+    <a class="btn" href="/creators/export.csv" download>Export roster CSV</a>
+    <a class="btn btn--primary" href="/creators/new">Add creator</a>
+  </div>
 </div>
+{% if deleted %}<p class="cleared-note">{{ ui.icon('check') }} Removed {{ deleted }} and their inquiries from the roster.</p>{% endif %}
+<p class="help roster-note">Changes made here last until the app restarts. To keep them, export the roster CSV and replace <code>seed/roster_seed.csv</code> with it.</p>
 <section class="panel">
   <div class="table-wrap">
     <table class="table">

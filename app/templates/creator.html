@@ -4,7 +4,8 @@
 {% block content %}
 <p class="crumbs"><a href="/creators">Creators</a> / {{ creator.name }}</p>
 
-{% if saved %}<p class="cleared-note">{{ ui.icon('check') }} Saved · {{ rescored }} inquir{{ 'y' if rescored == 1 else 'ies' }} re-scored against the new values.</p>{% endif %}
+{% if added %}<p class="cleared-note">{{ ui.icon('check') }} Added {{ creator.name }} to the roster · they're selectable in DM intake now.</p>
+{% elif saved %}<p class="cleared-note">{{ ui.icon('check') }} Saved · {{ rescored }} inquir{{ 'y' if rescored == 1 else 'ies' }} re-scored against the new values.</p>{% endif %}
 {% if error %}<p class="alert" role="alert">{{ ui.icon('x') }}<span>{{ error }} <span class="alert__ink">Nothing was saved.</span></span></p>{% endif %}
 
 <section class="panel profile" aria-labelledby="who">
@@ -18,13 +19,18 @@
     <div><dt class="stat__label">Avg reach</dt><dd class="stat__num num">{{ creator.avg_reach|num_in }}</dd></div>
     <div><dt class="stat__label">Engagement</dt><dd class="stat__num num">{{ creator.engagement_rate }}%</dd></div>
   </dl>
+  <div class="profile__actions">
+    <a class="btn btn--small" href="/creator/{{ creator.id }}/edit">Edit all details</a>
+    <a class="btn btn--small" href="/dm?creator={{ creator.id }}">{{ ui.icon('dm') }} Paste a DM for {{ creator.name.split()[0] }}</a>
+    <span class="help">{{ creator.email }}</span>
+  </div>
 </section>
 
 <div class="grid-3">
   <form class="panel" method="post" action="/creator/{{ creator.id }}/update">
     <div class="panel__head"><h2 class="panel__title">Rate card</h2><span class="panel__sub">per deliverable</span></div>
     <div class="panel__body form-rows">
-      {% for name, label in [('reel', 'Reel'), ('story', 'Story'), ('static_post', 'Static post'), ('carousel', 'Carousel')] %}
+      {% for name, label in [('reel', 'Reel'), ('story', 'Story'), ('static_post', 'Static post'), ('carousel', 'Carousel'), ('youtube_integration', 'YouTube integration')] if name != 'youtube_integration' or creator.rate_card.youtube_integration %}
       <div class="form-row"><label class="label" for="r-{{ name }}">{{ label }}</label><div class="input-affix"><span class="input-affix__pre">₹</span><input class="input num" id="r-{{ name }}" name="{{ name }}" value="{{ creator.rate_card[name]|num_in }}" inputmode="numeric"></div></div>
       {% endfor %}
       <div class="form-row"><label class="label" for="r-bundle">Bundle discount</label><div class="input-affix"><input class="input num" id="r-bundle" name="bundle_discount_pct" value="{{ creator.rate_card.bundle_discount_pct|pct_num }}" inputmode="decimal"><span class="input-affix__post">%</span></div></div>
@@ -94,6 +100,32 @@
   </section>
 </div>
 
+<section class="panel" aria-labelledby="dms-h">
+  <div class="panel__head">
+    <div><h2 class="panel__title" id="dms-h">Instagram DMs</h2><span class="panel__sub">{{ creator.ig_handle }} · DMs don't reach the inbox scan, so they're pasted in</span></div>
+    <a class="btn btn--small" href="/dm?creator={{ creator.id }}">{{ ui.icon('dm') }} Paste a DM for {{ creator.name.split()[0] }}</a>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th scope="col">Brand</th><th scope="col">From</th><th scope="col">Received</th><th scope="col">How it arrived</th><th scope="col" class="is-num">Score</th><th scope="col">Outcome</th></tr></thead>
+      <tbody>
+        {% for d in dms %}
+        <tr>
+          <td><a href="/inquiry/{{ d.id }}">{{ d.brand }}</a></td>
+          <td>{{ d.sender }}</td>
+          <td>{{ d.received|date_long }}</td>
+          <td class="muted">{{ 'Pasted in DM intake' if d.pasted else 'Sample inbox' }}</td>
+          <td class="is-num">{{ d.score }} <span class="muted">{{ d.priority }}</span></td>
+          <td><span class="outcome outcome--{{ d.outcome[1] }}">{{ d.outcome[0] }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="muted">No DMs yet — <a href="/dm?creator={{ creator.id }}">paste one for {{ creator.name.split()[0] }}</a>.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
 <section class="panel" aria-labelledby="hist-h">
   <div class="panel__head"><h2 class="panel__title" id="hist-h">Inquiry history</h2><span class="panel__sub">from the last scan, newest first</span></div>
   <div class="table-wrap">
@@ -109,7 +141,7 @@
           <td><span class="outcome outcome--{{ h.outcome[1] }}">{{ h.outcome[0] }}</span></td>
         </tr>
         {% else %}
-        <tr><td colspan="5" class="muted">No inquiries yet — run <a href="/">Scan inboxes</a> from the queue.</td></tr>
+        <tr><td colspan="5" class="muted">No inquiries yet — <a href="/dm?creator={{ creator.id }}">paste a DM</a> or run <a href="/">Scan inboxes</a> from the queue.</td></tr>
         {% endfor %}
       </tbody>
     </table>

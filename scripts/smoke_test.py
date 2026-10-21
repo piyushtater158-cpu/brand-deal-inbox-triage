@@ -24,7 +24,7 @@ import httpx
 SEED_DIR = Path(__file__).resolve().parent.parent / "seed"
 BASE = (sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000").rstrip("/")
 PAGES = ["/", "/dm", "/creators", "/pipeline", "/config", "/skipped",
-         "/creator/aanya_mehra", "/inquiry/msg_002"]
+         "/creator/aanya_mehra", "/creator/aanya_mehra/edit", "/creators/new", "/inquiry/msg_002"]
 HX = {"HX-Request": "true"}
 HINGLISH_DM = (
     "hi ma'am, humein aapke saath ek collab karna hai. budget 40k hai, "
@@ -45,6 +45,12 @@ def debug(c: httpx.Client) -> dict:
     return c.get("/api/debug").json()
 
 
+def seeded(inquiries: list[dict]) -> list[dict]:
+    """Pasted DMs (dm_*) survive a rescan, so a target that has had DMs added holds
+    more than the 29 seed inquiries — the seed checks only look at the seed ones."""
+    return [r for r in inquiries if not r["inquiry_id"].startswith("dm_")]
+
+
 def row(c: httpx.Client, inquiry_id: str) -> dict:
     return next(r for r in debug(c)["inquiries"] if r["inquiry_id"] == inquiry_id)
 
@@ -55,7 +61,7 @@ def set_ai(c: httpx.Client, on: bool) -> None:
 
 def golden_mismatches(c: httpx.Client) -> list[str]:
     expected = json.loads((SEED_DIR / "expected_results.json").read_text(encoding="utf-8"))
-    actual = {r["inquiry_id"]: r for r in debug(c)["inquiries"]}
+    actual = {r["inquiry_id"]: r for r in seeded(debug(c)["inquiries"])}
     bad = []
     for iid, exp in expected.items():
         a = actual.get(iid)
@@ -109,7 +115,7 @@ def run() -> None:
     check("POST /scan redirects to queue", r.status_code == 303 and r.headers.get("location") == "/",
           str(r.status_code))
     d = debug(c)
-    check("scan produced 29 inquiries", len(d["inquiries"]) == 29, str(len(d["inquiries"])))
+    check("scan produced 29 inquiries", len(seeded(d["inquiries"])) == 29, str(len(seeded(d["inquiries"]))))
     check("scan skipped 6 messages", d["skipped_count"] == 6, str(d["skipped_count"]))
     bad = golden_mismatches(c)
     check("AI-off results match seed/expected_results.json", not bad, "; ".join(bad[:5]))
@@ -128,7 +134,7 @@ def run() -> None:
     # Queue
     q = c.get("/").text
     cards = CARD.findall(q)
-    check("queue renders a card per inquiry", len(cards) == 29, str(len(cards)))
+    check("queue renders a card per inquiry", len(cards) == len(d["inquiries"]), str(len(cards)))
     rank = {"p1": 0, "p2": 1, "p3": 2, "ignore": 3}
     check("queue sorted by priority", [rank[p] for p in cards] == sorted(rank[p] for p in cards))
     check("skipped notice shows 6", "6 messages skipped" in q)
@@ -162,7 +168,7 @@ def run() -> None:
         resp = c.get(f"/inquiry/{r_['inquiry_id']}")
         if resp.status_code != 200 or 'id="assessment"' not in resp.text or 'id="decision-result"' not in resp.text:
             failures.append(f"{r_['inquiry_id']}:{resp.status_code}")
-    check("all 29 inquiry pages render with #assessment and #decision-result", not failures,
+    check("every inquiry page renders with #assessment and #decision-result", not failures,
           ", ".join(failures))
     nivara = c.get("/inquiry/msg_002").text
     check("Nivara page: conflict cap note and quote argument",
@@ -257,6 +263,43 @@ def run() -> None:
           len(set(ids)) == 2 and len(debug(c)["inquiries"]) == count_before + 3, ", ".join(ids))
     r = c.post("/dm/process", data={"creator_id": "aanya_mehra", "dm_text": ""})
     check("empty DM re-renders the form with a prompt", r.status_code == 200 and "Paste the DM text first" in r.text)
+
+    # Add a creator, connect a DM to them, keep it across a rescan, export, remove
+    stamp = str(int(time.time()))
+    new = {
+        "name": "Smoke Creator", "ig_handle": f"@smoke.{stamp}", "email": f"smoke.{stamp}@kalakaaar.in",
+        "niche": "food", "city": "Delhi", "languages": "Hindi", "followers": "1,00,000",
+        "avg_reach": "50000", "engagement_rate": "4", "reel": "40000", "story": "12000",
+        "static_post": "20000", "carousel": "30000", "youtube_integration": "", "bundle_discount_pct": "10",
+        "min_acceptable_pct": "70", "accepts_barter": "no", "barter_min_product_value": "0",
+        "usage_rights_default_days": "30", "max_usage_days_without_extra_fee": "30",
+        "max_paid_deals_per_month": "4", "current_booked_this_month": "0", "no_go_categories": "alcohol",
+        "p_brand": [""], "p_cat": [""], "p_excl": ["no"], "p_end": [""],
+        "b_start": [""], "b_end": [""], "b_reason": [""],
+    }
+    check("add creator form renders", "Add a creator" in c.get("/creators/new").text)
+    r = c.post("/creators/new", data={**new, "email": "nope"})
+    check("add creator rejects a bad email", r.status_code == 200 and "Nothing was saved" in r.text)
+    r = c.post("/creators/new", data=new)
+    loc = r.headers.get("location", "")
+    check("add creator redirects to their page", r.status_code == 303 and loc.startswith("/creator/"), loc)
+    new_id = loc.split("/")[-1].split("?")[0]
+    check("new creator preselected in DM intake",
+          f'<option value="{new_id}" selected>' in c.get(f"/dm?creator={new_id}").text)
+    r = c.post(f"/creator/{new_id}/edit", data={**new, "reel": "45,000"})
+    check("full edit saves and re-scores", r.status_code == 303 and "rescored=" in r.headers.get("location", ""))
+    dm_loc = add_dm(c, new_id, "hi, collab? budget 35k for ek reel")
+    dm_id = dm_loc.split("/")[-1]
+    check("pasted DM listed on the creator's page", f"/inquiry/{dm_id}" in c.get(f"/creator/{new_id}").text, dm_id)
+    c.post("/scan")
+    check("pasted DM survives a rescan", any(r_["inquiry_id"] == dm_id for r_ in debug(c)["inquiries"]))
+    export = c.get("/creators/export.csv")
+    check("roster CSV export includes the new creator",
+          export.status_code == 200 and export.text.startswith("id,name,ig_handle") and f"\n{new_id}," in export.text)
+    r = c.post(f"/creator/{new_id}/delete", data={"confirm": "yes"})
+    check("remove creator takes their DMs with them",
+          r.status_code == 303 and c.get(f"/creator/{new_id}").status_code == 404
+          and not any(r_["inquiry_id"] == dm_id for r_ in debug(c)["inquiries"]))
 
     # Pipeline
     pl = c.get("/pipeline").text

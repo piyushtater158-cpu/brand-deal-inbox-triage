@@ -117,10 +117,31 @@ def init_schema(conn: sqlite3.Connection) -> None:
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('ai_enabled', 'false')")
 
 
+MANUAL_DM_PREFIX = "dm_"
+
+
 def reset_ingest_tables(conn: sqlite3.Connection) -> None:
-    """Cleared on every 'Scan inboxes' — NOT creators, NOT decisions (append-only log)."""
-    for table in ("inquiries", "extractions", "assessments", "skipped_mail"):
-        conn.execute(f"DELETE FROM {table}")
+    """Cleared on every 'Scan inboxes' — NOT creators, NOT decisions (append-only log),
+    and NOT DMs a manager pasted in: no inbox scan can bring those back."""
+    p, n = MANUAL_DM_PREFIX, len(MANUAL_DM_PREFIX)
+    conn.execute("DELETE FROM extractions WHERE substr(inquiry_id, 1, ?) != ?", (n, p))
+    conn.execute("DELETE FROM assessments WHERE substr(inquiry_id, 1, ?) != ?", (n, p))
+    conn.execute("DELETE FROM inquiries WHERE substr(id, 1, ?) != ?", (n, p))
+    conn.execute("DELETE FROM skipped_mail")
+
+
+def delete_creator(conn: sqlite3.Connection, creator_id: str) -> int:
+    """The creator, their partners and every inquiry for them. Decisions stay — the
+    Pipeline log already shows a row whose inquiry is gone as cleared."""
+    ids = [r["id"] for r in conn.execute("SELECT id FROM inquiries WHERE creator_id = ?", (creator_id,))]
+    for iid in ids:
+        conn.execute("DELETE FROM extractions WHERE inquiry_id = ?", (iid,))
+        conn.execute("DELETE FROM assessments WHERE inquiry_id = ?", (iid,))
+    conn.execute("DELETE FROM inquiries WHERE creator_id = ?", (creator_id,))
+    conn.execute("DELETE FROM skipped_mail WHERE creator_id = ?", (creator_id,))
+    conn.execute("DELETE FROM partners WHERE creator_id = ?", (creator_id,))
+    conn.execute("DELETE FROM creators WHERE id = ?", (creator_id,))
+    return len(ids)
 
 
 def creators_loaded(conn: sqlite3.Connection) -> bool:
@@ -195,6 +216,51 @@ def load_creators_from_csv(path: Path | None = None) -> list[Creator]:
                 )
             )
     return creators
+
+
+CSV_FIELDNAMES = [
+    "id", "name", "ig_handle", "email", "niche_json", "city", "languages_json", "followers",
+    "avg_reach", "engagement_rate", "rate_card_json", "min_acceptable_pct", "accepts_barter",
+    "barter_min_product_value", "usage_rights_default_days", "max_usage_days_without_extra_fee",
+    "partners_json", "no_go_categories_json", "max_paid_deals_per_month", "current_booked_this_month",
+    "blackout_dates_json",
+]
+
+
+def _plain(n):
+    return int(n) if isinstance(n, float) and n.is_integer() else n
+
+
+def creator_to_csv_row(c: Creator) -> dict:
+    """One roster_seed.csv row — the exact columns load_creators_from_csv reads."""
+    rc = c.rate_card
+    return {
+        "id": c.id, "name": c.name, "ig_handle": c.ig_handle, "email": c.email,
+        "niche_json": json.dumps(c.niche), "city": c.city, "languages_json": json.dumps(c.languages),
+        "followers": c.followers, "avg_reach": c.avg_reach, "engagement_rate": c.engagement_rate,
+        "rate_card_json": json.dumps({
+            "reel": _plain(rc.reel), "story": _plain(rc.story), "static_post": _plain(rc.static_post),
+            "carousel": _plain(rc.carousel), "youtube_integration": _plain(rc.youtube_integration),
+            "bundle_discount_pct": rc.bundle_discount_pct,
+        }),
+        "min_acceptable_pct": c.min_acceptable_pct,
+        "accepts_barter": "true" if c.accepts_barter else "false",
+        "barter_min_product_value": _plain(c.barter_min_product_value),
+        "usage_rights_default_days": c.usage_rights_default_days,
+        "max_usage_days_without_extra_fee": c.max_usage_days_without_extra_fee,
+        "partners_json": json.dumps([
+            {"brand": p.brand, "category": p.category, "exclusive": p.exclusive,
+             "exclusivity_end_date": p.exclusivity_end_date.isoformat() if p.exclusivity_end_date else None}
+            for p in c.active_partners
+        ]),
+        "no_go_categories_json": json.dumps(c.no_go_categories),
+        "max_paid_deals_per_month": c.max_paid_deals_per_month,
+        "current_booked_this_month": c.current_booked_this_month,
+        "blackout_dates_json": json.dumps([
+            {"start": b.start.isoformat(), "end": b.end.isoformat(), "reason": b.reason}
+            for b in c.blackout_dates
+        ]),
+    }
 
 
 def save_creator(conn: sqlite3.Connection, c: Creator) -> None:

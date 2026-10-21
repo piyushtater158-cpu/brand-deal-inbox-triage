@@ -5,17 +5,21 @@ to those and renders Jinja2 templates.
 from __future__ import annotations
 
 import base64
+import csv
 import datetime as dt
+import io
 from pathlib import Path
+from urllib.parse import quote
 
 import yaml
 from fastapi import FastAPI, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app import ai, db, fmt, pipeline, view
+from app import ai, db, extract, fmt, pipeline, view
 from app.config_loader import load_config, reference_date, save_config
+from app.creator_form import new_creator_id, parse_creator_form, parse_number, values_from_creator, values_from_form
 from app.reply import ai_reply, draft_for_page
 from app.score import assess
 
@@ -323,7 +327,7 @@ def make_decision(request: Request, inquiry_id: str, action: str = Form(...),
 # -------------------------------------------------------------------------------
 
 @app.get("/creators", response_class=HTMLResponse)
-def creators_page(request: Request):
+def creators_page(request: Request, deleted: str = ""):
     with db.get_conn() as conn:
         rows = db.list_inquiries_with_assessments(conn)
         ref = reference_date()
@@ -335,7 +339,106 @@ def creators_page(request: Request):
                 "active_exclusives": [p for p in partners if p["state"] == "active"],
                 "count": sum(r["inquiry"]["creator_id"] == c.id for r in rows),
             })
-        return _render(request, "creators.html", {"rows": out, "active": "creators"}, conn)
+        return _render(request, "creators.html", {"rows": out, "active": "creators", "deleted": deleted}, conn)
+
+
+@app.get("/creators/export.csv")
+def export_roster():
+    """The live roster in roster_seed.csv format — the way to keep creators added or
+    edited here, since a free host's disk resets on every restart."""
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=db.CSV_FIELDNAMES, lineterminator="\n")
+    writer.writeheader()
+    with db.get_conn() as conn:
+        for c in db.list_creators(conn):
+            writer.writerow(db.creator_to_csv_row(c))
+    return Response(buf.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="roster_seed.csv"'})
+
+
+def _creator_form_context(conn, *, creator=None, values=None, error=None) -> dict:
+    return {
+        "creator": creator, "v": values or values_from_creator(creator), "error": error,
+        "categories": extract.category_vocabulary(),
+        "global_no_go": load_config()["global_no_go_categories"], "active": "creators",
+    }
+
+
+def _handle_taken(conn, handle: str, creator_id: str) -> str | None:
+    wanted = handle.strip().lstrip("@").lower()
+    for c in db.list_creators(conn):
+        if c.id != creator_id and c.ig_handle.lstrip("@").lower() == wanted:
+            return c.name
+    return None
+
+
+def _save_creator_form(request: Request, conn, values: dict, creator_id: str, existing):
+    """Shared by Add and Edit: parse, refuse a handle another creator already has, save,
+    re-score. Returns the error page on a bad form, None once saved."""
+    try:
+        creator = parse_creator_form(values, creator_id)
+        owner = _handle_taken(conn, creator.ig_handle, creator_id)
+        if owner:
+            raise ValueError(f"{creator.ig_handle} is already on the roster as {owner}.")
+    except ValueError as e:
+        return _render(request, "creator_form.html",
+                       _creator_form_context(conn, creator=existing, values=values, error=str(e)), conn)
+    db.save_creator(conn, creator)
+    return None
+
+
+@app.get("/creators/new", response_class=HTMLResponse)
+def new_creator_page(request: Request):
+    with db.get_conn() as conn:
+        return _render(request, "creator_form.html", _creator_form_context(conn), conn)
+
+
+@app.post("/creators/new")
+async def create_creator(request: Request):
+    values = values_from_form(await request.form())
+    with db.get_conn() as conn:
+        creator_id = new_creator_id(values["name"], {c.id for c in db.list_creators(conn)})
+        error_page = _save_creator_form(request, conn, values, creator_id, None)
+        if error_page:
+            return error_page
+    return RedirectResponse(f"/creator/{creator_id}?added=1", status_code=303)
+
+
+@app.get("/creator/{creator_id}/edit", response_class=HTMLResponse)
+def edit_creator_page(request: Request, creator_id: str):
+    with db.get_conn() as conn:
+        creator = db.get_creator(conn, creator_id)
+        if creator is None:
+            raise HTTPException(status_code=404, detail="Creator not found")
+        return _render(request, "creator_form.html", _creator_form_context(conn, creator=creator), conn)
+
+
+@app.post("/creator/{creator_id}/edit")
+async def edit_creator(request: Request, creator_id: str):
+    values = values_from_form(await request.form())
+    with db.get_conn() as conn:
+        existing = db.get_creator(conn, creator_id)
+        if existing is None:
+            raise HTTPException(status_code=404, detail="Creator not found")
+        error_page = _save_creator_form(request, conn, values, creator_id, existing)
+        if error_page:
+            return error_page
+        count = pipeline.rescore_inquiries(conn, creator_id)
+    return RedirectResponse(f"/creator/{creator_id}?saved=1&rescored={count}", status_code=303)
+
+
+@app.post("/creator/{creator_id}/delete")
+def delete_creator(request: Request, creator_id: str, confirm: str = Form("")):
+    with db.get_conn() as conn:
+        creator = db.get_creator(conn, creator_id)
+        if creator is None:
+            raise HTTPException(status_code=404, detail="Creator not found")
+        if confirm != "yes":
+            ctx = _creator_form_context(conn, creator=creator,
+                                        error=f"Tick the box to confirm removing {creator.name}.")
+            return _render(request, "creator_form.html", ctx, conn)
+        db.delete_creator(conn, creator_id)
+    return RedirectResponse(f"/creators?deleted={quote(creator.name)}", status_code=303)
 
 
 def _creator_context(conn, creator_id: str, **extra) -> dict:
@@ -343,50 +446,41 @@ def _creator_context(conn, creator_id: str, **extra) -> dict:
     if creator is None:
         raise HTTPException(status_code=404, detail="Creator not found")
     ref = reference_date()
-    history = []
+    history, dms = [], []
     for r in db.list_inquiries_with_assessments(conn):
-        if r["inquiry"]["creator_id"] != creator_id:
+        inq = r["inquiry"]
+        if inq["creator_id"] != creator_id:
             continue
-        d = db.get_decision_for_inquiry(conn, r["inquiry"]["id"])
+        d = db.get_decision_for_inquiry(conn, inq["id"])
         outcome = view.OUTCOMES.get(d["action"], ("Logged", "open")) if d else ("In queue", "open")
-        history.append({
-            "id": r["inquiry"]["id"], "received": r["inquiry"]["received_at"],
-            "brand": r["extraction"].brand or r["inquiry"]["sender_domain"],
-            "score": int(r["assessment"].final_score), "offer": r["assessment"].offer_value,
-            "outcome": outcome,
-        })
+        row = {
+            "id": inq["id"], "received": inq["received_at"],
+            "brand": r["extraction"].brand or inq["sender_domain"],
+            "score": int(r["assessment"].final_score), "priority": r["assessment"].priority,
+            "offer": r["assessment"].offer_value, "outcome": outcome,
+        }
+        history.append(row)
+        if inq["source"] == "dm":
+            dms.append({**row, "brand": r["extraction"].brand or "Brand not identified",
+                        "sender": inq["sender_email_or_handle"] or inq["sender_name"],
+                        "pasted": inq["id"].startswith(db.MANUAL_DM_PREFIX)})
     history.sort(key=lambda h: h["received"], reverse=True)
+    dms.sort(key=lambda h: h["received"], reverse=True)
     cfg = load_config()
     return {
         "creator": creator, "initials": view.initials(creator.name),
         "partners": [view.partner_view(p, ref) for p in creator.active_partners],
-        "capacity": view.capacity_view(creator), "history": history,
+        "capacity": view.capacity_view(creator), "history": history, "dms": dms,
         "month_label": f"{ref:%B %Y}", "bundle_min": cfg["bundle_discount_min_deliverables"],
         "global_no_go": cfg["global_no_go_categories"], "active": "creators", **extra,
     }
 
 
 @app.get("/creator/{creator_id}", response_class=HTMLResponse)
-def creator_page(request: Request, creator_id: str, saved: int = 0, rescored: int = 0):
+def creator_page(request: Request, creator_id: str, saved: int = 0, rescored: int = 0, added: int = 0):
     with db.get_conn() as conn:
         return _render(request, "creator.html",
-                       _creator_context(conn, creator_id, saved=saved, rescored=rescored), conn)
-
-
-def _number(raw: str | None, label: str, *, pct: bool = False, integer: bool = False):
-    """Form numbers as people type them: '62,000', '₹62000', '10' (percent)."""
-    if raw is None or raw.strip() == "":
-        return None
-    text = raw.replace(",", "").replace("₹", "").replace("%", "").strip()
-    try:
-        value = float(text)
-    except ValueError:
-        raise ValueError(f"{label} must be a number, got '{raw}'.") from None
-    if value < 0:
-        raise ValueError(f"{label} can't be negative.")
-    if pct:
-        value /= 100
-    return int(value) if integer else value
+                       _creator_context(conn, creator_id, saved=saved, rescored=rescored, added=added), conn)
 
 
 @app.post("/creator/{creator_id}/update")
@@ -397,14 +491,15 @@ async def update_creator(request: Request, creator_id: str):
         if creator is None:
             raise HTTPException(status_code=404, detail="Creator not found")
         try:
-            rates = {k: _number(form.get(k), label) for k, label in
-                     [("reel", "Reel"), ("story", "Story"), ("static_post", "Static post"), ("carousel", "Carousel")]}
-            bundle = _number(form.get("bundle_discount_pct"), "Bundle discount", pct=True)
-            minimum = _number(form.get("min_acceptable_pct"), "Minimum acceptable", pct=True)
-            barter_min = _number(form.get("barter_min_product_value"), "Barter minimum")
-            usage_default = _number(form.get("usage_rights_default_days"), "Usage rights default", integer=True)
-            usage_free = _number(form.get("max_usage_days_without_extra_fee"), "Max usage", integer=True)
-            capacity = _number(form.get("max_paid_deals_per_month"), "Monthly capacity", integer=True)
+            rates = {k: parse_number(form.get(k), label) for k, label in
+                     [("reel", "Reel"), ("story", "Story"), ("static_post", "Static post"), ("carousel", "Carousel"),
+                      ("youtube_integration", "YouTube integration")]}
+            bundle = parse_number(form.get("bundle_discount_pct"), "Bundle discount", pct=True)
+            minimum = parse_number(form.get("min_acceptable_pct"), "Minimum acceptable", pct=True)
+            barter_min = parse_number(form.get("barter_min_product_value"), "Barter minimum")
+            usage_default = parse_number(form.get("usage_rights_default_days"), "Usage rights default", integer=True)
+            usage_free = parse_number(form.get("max_usage_days_without_extra_fee"), "Max usage", integer=True)
+            capacity = parse_number(form.get("max_paid_deals_per_month"), "Monthly capacity", integer=True)
             if bundle is not None and bundle >= 1 or minimum is not None and minimum > 1:
                 raise ValueError("Percentages must be between 0 and 100.")
         except ValueError as e:
@@ -457,9 +552,11 @@ DM_PREVIEW_FIELDS = ["brand", "brand_category", "budget_amount", "product_value"
 
 
 def _dm_context(conn, *, form=None, preview=None, error=None) -> dict:
+    creators = db.list_creators(conn)
+    form = form or {"creator_id": "", "sender": "", "dm_text": ""}
     return {
-        "creators": db.list_creators(conn), "preview": preview, "error": error,
-        "form": form or {"creator_id": "", "sender": "", "dm_text": ""}, "active": "dm",
+        "creators": creators, "preview": preview, "error": error, "form": form, "active": "dm",
+        "for_creator": next((c for c in creators if c.id == form["creator_id"]), None),
     }
 
 
@@ -476,9 +573,10 @@ def _dm_preview(conn, creator_id: str, text: str, ext, *, from_screenshot=False,
 
 
 @app.get("/dm", response_class=HTMLResponse)
-def dm_intake_page(request: Request):
+def dm_intake_page(request: Request, creator: str = ""):
     with db.get_conn() as conn:
-        return _render(request, "dm_intake.html", _dm_context(conn), conn)
+        form = {"creator_id": creator, "sender": "", "dm_text": ""}
+        return _render(request, "dm_intake.html", _dm_context(conn, form=form), conn)
 
 
 @app.post("/dm/process", response_class=HTMLResponse)
@@ -615,7 +713,7 @@ def _lines(text: str) -> list[str]:
 def _config_from_form(form) -> dict:
     cfg = load_config(force_reload=True)
     cfg = yaml.safe_load(yaml.safe_dump(cfg))  # a deep copy we can mutate
-    num = lambda key, label, **kw: _number(form.get(key), label, **kw)  # noqa: E731
+    num = lambda key, label, **kw: parse_number(form.get(key), label, **kw)  # noqa: E731
 
     ref = (form.get("reference_date") or "").strip()
     if ref:

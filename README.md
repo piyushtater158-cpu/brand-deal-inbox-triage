@@ -89,11 +89,12 @@ drop this key (the engine falls back to `date.today()` when it's unset).
 ## Verifying it
 
 ```bash
-pytest                           # 71 tests: quote math, extraction regex, AI-off
+pytest                           # 88 tests: quote math, extraction regex, AI-off
                                   # fallbacks, free-models-only + AI gap-filling rules,
                                   # manager edits + live re-score, DM
-                                  # preview, config/creator saves, and the full
-                                  # scenario fixture
+                                  # preview, config/creator saves, adding / editing /
+                                  # removing creators, roster CSV round-trip, pasted
+                                  # DMs surviving a rescan, and the full scenario fixture
 python scripts/check_expected.py # standalone AI-off acceptance check, no pytest
                                   # needed — exits 0 on a full match
 ```
@@ -101,11 +102,12 @@ python scripts/check_expected.py # standalone AI-off acceptance check, no pytest
 Against a running instance (the Docker container, or a deployed URL):
 
 ```bash
-python scripts/smoke_test.py [base_url]    # 84 HTTP checks: every screen, filters,
-                                           # edits, decisions, DM intake, config,
-                                           # AI toggle, 404s, concurrent writes, and
-                                           # the expected-results match
-python scripts/browser_test.py [base_url]  # 15 checks in real Edge/Chrome: HTMX swaps,
+python scripts/smoke_test.py [base_url]    # 95 HTTP checks: every screen, filters,
+                                           # edits, decisions, DM intake, adding a
+                                           # creator + their DM, config, AI toggle,
+                                           # 404s, concurrent writes, and the
+                                           # expected-results match
+python scripts/browser_test.py [base_url]  # 16 checks in real Edge/Chrome: HTMX swaps,
                                            # copy-to-clipboard, DM preview, with every
                                            # off-host request blocked; screenshots of
                                            # each screen land in scripts/screens/
@@ -154,6 +156,32 @@ barter above a minimum). **Rate-card figures are placeholders** — `config.yaml
 `scripts/generate_seed_creators.py` flag this; they haven't been checked against a
 real Indian creator rate-card source yet (see "What I'd do next").
 
+## Adding or editing a creator
+
+**Creators → Add creator** opens one form with everything the engine reads: profile
+(name, handle, collabs email, niche, city, languages), audience, rate card (including
+YouTube integration), rules, monthly capacity and deals booked this month, blackout
+dates, partners with their exclusivity end dates, and no-go categories. **Edit all
+details** on a creator's page opens the same form filled in. Saving validates every
+value (nothing is saved on an error, and the form keeps what you typed), then
+re-scores that creator's inquiries. The same page can remove a creator, which takes
+their inquiries with them.
+
+Niche, partner categories and no-go categories are matched word-for-word against
+brand categories (the brand lookup in `/config`), so the form suggests the categories
+the engine knows.
+
+**DMs.** A new creator has no seed inbox, so their deals come in as Instagram DMs.
+Their page has an **Instagram DMs** panel listing every DM inquiry for them, and a
+**Paste a DM for …** button that opens DM intake with them preselected. DMs pasted in
+are kept when **Scan inboxes** rebuilds the queue; seed DMs are rebuilt from `seed/`
+as before.
+
+**Keeping them.** On the free host, creators added here and pasted DMs last until the
+next restart (see below). To make a creator permanent, use **Export roster CSV** on
+the Creators page, replace `seed/roster_seed.csv` with the download, and commit. The
+export is in exactly the format the app loads on boot.
+
 ## Plugging in a real inbox
 
 The scanner sits behind one interface (`app/scanner.py`):
@@ -174,7 +202,8 @@ it applies identically regardless of which scanner is installed.
 
 SQLite is treated as a rebuildable artifact: `seed/roster_seed.csv` and
 `seed/demo_inbox.json` are the source of truth, "Scan inboxes" rebuilds inquiries from
-them, and creators load from the seed CSV the first time the database file is touched.
+them (keeping DMs pasted in by hand, which no scan could bring back), and creators load
+from the seed CSV the first time the database file is touched.
 This means the app runs on any free, ephemeral-filesystem host unchanged. The
 trade-off: the decision log (an append-only table, never cleared by a rescan) resets
 on a cold start on a host that spins the container down between uses. Fine for a

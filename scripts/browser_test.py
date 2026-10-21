@@ -46,8 +46,10 @@ def run(page, blocked: list[str], console_errors: list[str]) -> None:
     page.locator("form[action='/scan'] button").first.click()
     page.wait_for_url(f"{BASE}/")
     cards = page.locator("#queue-list .qcard")
-    expect(cards).to_have_count(29)
-    check("scan from the browser fills the queue", cards.count() == 29, str(cards.count()))
+    # Pasted DMs (dm_*) survive a rescan, so only the seed cards are counted.
+    seed_cards = page.locator("#queue-list .qcard:not(:has(a[href^='/inquiry/dm_']))")
+    expect(seed_cards).to_have_count(29)
+    check("scan from the browser fills the queue", seed_cards.count() == 29, str(seed_cards.count()))
     shot(page, "02-queue")
 
     page.locator("#f-pri").select_option("P1")
@@ -108,9 +110,12 @@ def run(page, blocked: list[str], console_errors: list[str]) -> None:
     expect(page.locator("form.ai-toggle--off")).to_have_count(1)
     check("AI toggle flips on and back off", True)
 
-    page.goto(f"{BASE}/dm")
+    page.goto(f"{BASE}/creator/aanya_mehra")
+    page.get_by_role("link", name="Paste a DM for Aanya").first.click()
+    page.wait_for_url("**/dm?creator=aanya_mehra")
+    check("creator page links to DM intake with the creator preselected",
+          page.locator("#dm-creator").input_value() == "aanya_mehra")
     shot(page, "07-dm-ai-off")
-    page.locator("#dm-creator").select_option("aanya_mehra")
     page.locator("#dm-text").fill(HINGLISH_DM)
     page.get_by_role("button", name="Process").click()
     expect(page.get_by_text("Check before adding to the queue")).to_be_visible()
@@ -127,7 +132,8 @@ def run(page, blocked: list[str], console_errors: list[str]) -> None:
 
     for path, name in [("/creator/aanya_mehra", "09-creator"), ("/creator/kabir_shah", "10-creator-blackout"),
                        ("/creators", "11-creators"), ("/pipeline", "12-pipeline"), ("/config", "13-config"),
-                       ("/skipped", "14-skipped")]:
+                       ("/skipped", "14-skipped"), ("/creators/new", "15-creator-add"),
+                       ("/creator/aanya_mehra/edit", "16-creator-edit")]:
         page.goto(f"{BASE}{path}")
         shot(page, name)
     check("no requests left the app's host", not blocked, ", ".join(sorted(set(blocked))[:5]))

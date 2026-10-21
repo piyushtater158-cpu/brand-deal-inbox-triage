@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% import "partials/ui.html" as ui %}
+{% set editing = creator is not none %}
+{% block title %}{{ ('Edit ' ~ creator.name) if editing else 'Add creator' }}{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="/creators">Creators</a> / {% if editing %}<a href="/creator/{{ creator.id }}">{{ creator.name }}</a> / Edit{% else %}Add creator{% endif %}</p>
+<div class="page-head">
+  <div>
+    <h1>{{ ('Edit ' ~ creator.name) if editing else 'Add a creator' }}</h1>
+    <p class="page-head__meta">{% if editing %}Saving re-scores every inquiry for {{ creator.name.split()[0] }}.{% else %}They join the roster straight away and show up in DM intake. Inbox scans only cover the seed inboxes, so their deals come in through pasted DMs.{% endif %}</p>
+  </div>
+</div>
+
+{% if error %}<p class="alert" role="alert">{{ ui.icon('x') }}<span>{{ error }} <span class="alert__ink">Nothing was saved.</span></span></p>{% endif %}
+
+<datalist id="category-list">{% for c in categories %}<option value="{{ c }}"></option>{% endfor %}</datalist>
+
+<form class="config" method="post" action="{{ ('/creator/' ~ creator.id ~ '/edit') if editing else '/creators/new' }}">
+  <div class="grid-2">
+    <fieldset class="fieldset">
+      <legend class="fieldset__legend">Profile</legend>
+      <div class="fieldset__body">
+        <div class="form-row form-row--wide"><label class="label" for="c-name">Name</label><input class="input" id="c-name" name="name" value="{{ v.name }}" required></div>
+        <div class="form-row form-row--wide"><label class="label" for="c-handle">Instagram handle</label><input class="input" id="c-handle" name="ig_handle" value="{{ v.ig_handle }}" placeholder="@handle" required></div>
+        <div class="form-row form-row--wide"><label class="label" for="c-email">Collabs email</label><input class="input" id="c-email" name="email" type="email" value="{{ v.email }}" placeholder="name.collabs@kalakaaar.in" required></div>
+        <div class="form-row form-row--wide"><label class="label" for="c-niche">Niche</label><input class="input" id="c-niche" name="niche" value="{{ v.niche }}" list="category-list" placeholder="beauty, skincare" required></div>
+        <p class="help">Comma-separated, first one is the main niche. Brand fit compares each brand's category with these words, so use the categories suggested in the list.</p>
+        <div class="form-row form-row--wide"><label class="label" for="c-city">City</label><input class="input" id="c-city" name="city" value="{{ v.city }}"></div>
+        <div class="form-row form-row--wide"><label class="label" for="c-lang">Languages</label><input class="input" id="c-lang" name="languages" value="{{ v.languages }}" placeholder="Hindi, English"></div>
+      </div>
+    </fieldset>
+
+    <fieldset class="fieldset">
+      <legend class="fieldset__legend">Audience</legend>
+      <div class="fieldset__body">
+        <div class="form-row"><label class="label" for="c-followers">Followers</label><input class="input num" id="c-followers" name="followers" value="{{ v.followers }}" inputmode="numeric" required></div>
+        <div class="form-row"><label class="label" for="c-reach">Average reach</label><input class="input num" id="c-reach" name="avg_reach" value="{{ v.avg_reach }}" inputmode="numeric" required></div>
+        <div class="form-row"><label class="label" for="c-eng">Engagement rate</label><div class="input-affix"><input class="input num" id="c-eng" name="engagement_rate" value="{{ v.engagement_rate }}" inputmode="decimal" required><span class="input-affix__post">%</span></div></div>
+      </div>
+    </fieldset>
+  </div>
+
+  <div class="grid-2">
+    <fieldset class="fieldset">
+      <legend class="fieldset__legend">Rate card <span class="fieldset__desc">Per deliverable. Every quote is built from these.</span></legend>
+      <div class="fieldset__body">
+        {% for name, label in [('reel', 'Reel'), ('story', 'Story'), ('static_post', 'Static post'), ('carousel', 'Carousel'), ('youtube_integration', 'YouTube integration')] %}
+        <div class="form-row"><label class="label" for="r-{{ name }}">{{ label }}</label><div class="input-affix"><span class="input-affix__pre">₹</span><input class="input num" id="r-{{ name }}" name="{{ name }}" value="{{ v[name] }}" inputmode="numeric"{{ ' required' if name != 'youtube_integration' }}></div></div>
+        {% endfor %}
+        <p class="help">Leave YouTube integration empty if they don't do it.</p>
+        <div class="form-row"><label class="label" for="r-bundle">Bundle discount</label><div class="input-affix"><input class="input num" id="r-bundle" name="bundle_discount_pct" value="{{ v.bundle_discount_pct }}" inputmode="decimal"><span class="input-affix__post">%</span></div></div>
+      </div>
+    </fieldset>
+
+    <fieldset class="fieldset">
+      <legend class="fieldset__legend">Rules <span class="fieldset__desc">Used in every score.</span></legend>
+      <div class="fieldset__body">
+        <div class="form-row"><label class="label" for="u-min">Minimum acceptable</label><div class="input-affix"><input class="input num" id="u-min" name="min_acceptable_pct" value="{{ v.min_acceptable_pct }}" inputmode="decimal" required><span class="input-affix__post">% of quote</span></div></div>
+        <div class="form-row"><label class="label" for="u-barter">Accepts barter</label><select class="select" id="u-barter" name="accepts_barter"><option value="yes"{{ ' selected' if v.accepts_barter == 'yes' }}>Yes</option><option value="no"{{ ' selected' if v.accepts_barter != 'yes' }}>No</option></select></div>
+        <div class="form-row"><label class="label" for="u-bmin">Barter minimum product value</label><div class="input-affix"><span class="input-affix__pre">₹</span><input class="input num" id="u-bmin" name="barter_min_product_value" value="{{ v.barter_min_product_value }}" inputmode="numeric"></div></div>
+        <div class="form-row"><label class="label" for="u-usage">Usage rights default</label><div class="input-affix"><input class="input num" id="u-usage" name="usage_rights_default_days" value="{{ v.usage_rights_default_days }}" inputmode="numeric" required><span class="input-affix__post">days</span></div></div>
+        <div class="form-row"><label class="label" for="u-max">Max usage without extra fee</label><div class="input-affix"><input class="input num" id="u-max" name="max_usage_days_without_extra_fee" value="{{ v.max_usage_days_without_extra_fee }}" inputmode="numeric" required><span class="input-affix__post">days</span></div></div>
+      </div>
+    </fieldset>
+  </div>
+
+  <div class="grid-2">
+    <fieldset class="fieldset">
+      <legend class="fieldset__legend">Availability <span class="fieldset__desc">Capacity full and Blackout clash flags come from here.</span></legend>
+      <div class="fieldset__body">
+        <div class="form-row"><label class="label" for="a-max">Monthly capacity</label><div class="input-affix"><input class="input num" id="a-max" name="max_paid_deals_per_month" value="{{ v.max_paid_deals_per_month }}" inputmode="numeric" required><span class="input-affix__post">deals</span></div></div>
+        <div class="form-row"><label class="label" for="a-booked">Booked this month</label><div class="input-affix"><input class="input num" id="a-booked" name="current_booked_this_month" value="{{ v.current_booked_this_month }}" inputmode="numeric"><span class="input-affix__post">deals</span></div></div>
+        <p class="label">Blackout dates</p>
+        <div class="table-wrap">
+          <table class="table lookup">
+            <thead><tr><th scope="col">From</th><th scope="col">To</th><th scope="col">Reason</th></tr></thead>
+            <tbody>
+              {% for b in v.blackouts + [{'start': '', 'end': '', 'reason': ''}] %}
+              <tr>
+                <td><input class="input" type="date" aria-label="Blackout {{ loop.index }} from" name="b_start" value="{{ b.start }}"></td>
+                <td><input class="input" type="date" aria-label="Blackout {{ loop.index }} to" name="b_end" value="{{ b.end }}"></td>
+                <td><input class="input" aria-label="Blackout {{ loop.index }} reason" name="b_reason" value="{{ b.reason }}" placeholder="{{ 'Add a blackout' if loop.last else '' }}"></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="help">The last row is empty for adding one. Clear both dates on a row to remove it.</p>
+      </div>
+    </fieldset>
+
+    <fieldset class="fieldset">
+      <legend class="fieldset__legend">No-go categories <span class="fieldset__desc">Score 0, flagged No-go. One per line.</span></legend>
+      <div class="fieldset__body">
+        <label class="visually-hidden" for="n-list">No-go categories</label>
+<textarea class="textarea" id="n-list" name="no_go_categories" rows="6" placeholder="alcohol&#10;tobacco">{{ v.no_go_categories }}</textarea>
+        <p class="help">Use the exact category words brands are filed under (see Config's brand lookup), e.g. {{ categories[:6]|join(', ') }}. Agency-wide no-gos also apply: {{ global_no_go|join(', ') }}.</p>
+      </div>
+    </fieldset>
+  </div>
+
+  <fieldset class="fieldset">
+    <legend class="fieldset__legend">Partners <span class="fieldset__desc">An active exclusive partner blocks every inquiry in that category (Conflict, score capped at 20).</span></legend>
+    <div class="table-wrap">
+      <table class="table lookup">
+        <thead><tr><th scope="col">Brand</th><th scope="col">Category</th><th scope="col">Exclusive</th><th scope="col">Exclusivity ends</th></tr></thead>
+        <tbody>
+          {% for p in v.partners + [{'brand': '', 'category': '', 'exclusive': 'no', 'end': ''}] %}
+          <tr>
+            <td><input class="input" aria-label="Partner {{ loop.index }} brand" name="p_brand" value="{{ p.brand }}" placeholder="{{ 'Add a partner' if loop.last else '' }}"></td>
+            <td><input class="input" aria-label="Partner {{ loop.index }} category" name="p_cat" value="{{ p.category }}" list="category-list"></td>
+            <td><select class="select" aria-label="Partner {{ loop.index }} exclusive" name="p_excl"><option value="no"{{ ' selected' if p.exclusive != 'yes' }}>No</option><option value="yes"{{ ' selected' if p.exclusive == 'yes' }}>Yes</option></select></td>
+            <td><input class="input" type="date" aria-label="Partner {{ loop.index }} exclusivity end" name="p_end" value="{{ p.end }}"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="help fieldset__foot">Leave the end date empty for an exclusivity with no end. Clear brand and category on a row to remove it.</p>
+  </fieldset>
+
+  <div class="savebar">
+    <span class="muted">{{ "Saving validates every value, then re-scores this creator's inquiries." if editing else "Saving validates every value before adding them to the roster." }}</span>
+    <span class="page-head__actions">
+      <a class="btn" href="{{ ('/creator/' ~ creator.id) if editing else '/creators' }}">Cancel</a>
+      <button class="btn btn--primary" type="submit">{{ 'Save changes' if editing else 'Add creator' }}</button>
+    </span>
+  </div>
+</form>
+
+{% if editing %}
+<form class="panel danger-zone" method="post" action="/creator/{{ creator.id }}/delete">
+  <div class="panel__body stack">
+    <div>
+      <h2 class="panel__title">Remove {{ creator.name }}</h2>
+      <p class="help">Removes them and every inquiry in their queue. The decision log keeps its rows. On this demo host a restart reloads the seed roster.</p>
+    </div>
+    <label class="danger-zone__confirm"><input type="checkbox" name="confirm" value="yes"> Yes, remove {{ creator.name.split()[0] }} from the roster</label>
+    <div><button class="btn danger-zone__btn" type="submit">Remove creator</button></div>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

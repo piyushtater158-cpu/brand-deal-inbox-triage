@@ -5,7 +5,7 @@
 <div class="page-head">
   <div>
     <h1>DM intake</h1>
-    <p class="page-head__meta">Instagram DMs don't reach the inbox scan. Paste the text{{ ' or upload a screenshot' if ai_on }} to add one to the queue.</p>
+    <p class="page-head__meta">Instagram DMs don't reach the inbox scan. Paste the text{{ ' or upload a screenshot' if ai_on }} to add one to the queue.{% if for_creator %} For <a href="/creator/{{ for_creator.id }}">{{ for_creator.name }}</a> {{ for_creator.ig_handle }} — it'll show in their Instagram DMs list.{% endif %}</p>
   </div>
 </div>
 
@@ -77,7 +77,7 @@
     </div>
     {% endfor %}
     <div class="panel__body form-foot">
-      <a class="btn" href="/dm">Discard</a>
+      <a class="btn" href="/dm{{ ('?creator=' ~ form.creator_id) if form.creator_id }}">Discard</a>
       <button class="btn btn--primary" type="submit">Add to queue</button>
     </div>
   </form>

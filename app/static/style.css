@@ -741,6 +741,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .skipped summary { display: inline; cursor: pointer; color: var(--indigo); text-decoration: underline; }
 .skipped__list { flex-basis: 100%; display: grid; gap: 2px; margin-top: var(--s1); padding-left: var(--s5); font-size: var(--fs-xs); color: var(--ink-2); }
 .config-yaml { font-family: var(--font-mono); font-size: var(--fs-sm); min-height: 420px; }
+.form-row--wide { grid-template-columns: 160px 1fr; }
+.roster-note { margin: 0 0 var(--s3); }
+.profile__actions { grid-column: 1 / -1; display: flex; gap: var(--s2); flex-wrap: wrap; }
+.fieldset__foot { padding: 0 var(--s4) var(--s4); }
+.danger-zone { border-color: var(--stop-line); }
+.danger-zone .panel__title { color: var(--stop); }
+.danger-zone__confirm { display: flex; gap: var(--s2); align-items: center; font-size: var(--fs-sm); font-weight: 600; }
+.danger-zone__btn { color: var(--stop); border-color: var(--stop-line); }
 .details__summary { cursor: pointer; padding: var(--s3) var(--s4); font-weight: 700; }
 
 /* ---------- 21. Small fixes ---------- */
