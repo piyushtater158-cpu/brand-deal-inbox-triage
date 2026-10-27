@@ -107,7 +107,9 @@ def _handle_error(status_code: int, message: str) -> None:
         _pause_for(_seconds_to_utc_midnight(), "Free-model daily limit reached.")
     elif status_code == 429:
         _pause_for(60, "Free-model rate limit hit.")
-    elif status_code in (401, 403):
+    elif status_code == 401:
+        # Not 403: OpenRouter also returns 403 for one model's access rules, which
+        # should only skip that chunk.
         _pause_for(3600, "The AI key was rejected.")
     elif status_code == 402:
         _pause_for(3600, "OpenRouter refused the request (credits).")

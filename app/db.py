@@ -112,9 +112,15 @@ CREATE TABLE IF NOT EXISTS ai_cache (
 """
 
 
+def default_ai_enabled() -> str:
+    """AI_ENABLED_DEFAULT seeds the toggle for a fresh database. On an ephemeral-disk host
+    every wake is a fresh database, so this is the only setting that outlives a restart."""
+    return "true" if os.environ.get("AI_ENABLED_DEFAULT", "").strip().lower() in ("1", "true", "yes", "on") else "false"
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
-    conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('ai_enabled', 'false')")
+    conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('ai_enabled', ?)", (default_ai_enabled(),))
 
 
 MANUAL_DM_PREFIX = "dm_"

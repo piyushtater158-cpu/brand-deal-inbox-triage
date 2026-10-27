@@ -61,14 +61,17 @@ python -m venv .venv
 `render.yaml` describes one free Docker web service in Singapore. The container binds
 to the `PORT` Render injects. Only `OPENROUTER_API_KEY` is needed for AI (the free
 model lists live in `config.yaml`); leave it empty and the app runs fully on the rules
-path, with AI off.
+path, with AI off. `AI_ENABLED_DEFAULT=true` (set in `render.yaml`) makes the header
+toggle start on; without it the toggle starts off, and since every wake is a fresh
+database, a toggle flipped by hand doesn't survive the next spin-down.
 
 Two free-tier caveats, both expected by design:
 
 - **Spin-down.** The service sleeps after about 15 minutes idle, and the first request
   after that takes up to a minute while it wakes.
 - **Ephemeral disk.** Every wake or redeploy starts with an empty database. On boot the
-  app reloads creators from `seed/` and runs a rules-only scan, so the queue is always
+  app reloads creators from `seed/` and runs a rules-only scan (even with AI on, because a
+  wake shouldn't wait on a model), so the queue is always
   populated when someone opens it. The decision log, `/config` edits and the AI cache
   reset too (see "Why the database is rebuildable" below).
 
@@ -89,7 +92,7 @@ drop this key (the engine falls back to `date.today()` when it's unset).
 ## Verifying it
 
 ```bash
-pytest                           # 88 tests: quote math, extraction regex, AI-off
+pytest                           # 93 tests: quote math, extraction regex, AI-off
                                   # fallbacks, free-models-only + AI gap-filling rules,
                                   # manager edits + live re-score, DM
                                   # preview, config/creator saves, adding / editing /
@@ -236,7 +239,12 @@ feel broken:
 - **Every successful answer is cached** in SQLite by task + prompt, so a rescan, a DM
   preview → Add to queue, or a revisit doesn't spend quota again.
 - **Rate limits pause AI instead of stalling it.** A per-minute limit pauses AI for a
-  minute, the daily limit until 00:00 UTC; the header says so, and rules cover.
+  minute, the daily limit until 00:00 UTC; the header says so, and rules cover. An
+  upstream provider's 429, a retired model's 404 or a model-specific 403 only skips
+  that model chunk; only a rejected key (401) pauses AI.
+- **Free model slugs churn.** OpenRouter retires `:free` variants without notice
+  (two in this list were retired in October 2026). If AI stops filling gaps, check
+  the slugs in `config.yaml` against `https://openrouter.ai/api/v1/models`.
 
 If `OPENROUTER_API_KEY` isn't set, every AI call returns `None` immediately and the
 caller falls through to the rules path — "AI on, unconfigured" behaves identically to

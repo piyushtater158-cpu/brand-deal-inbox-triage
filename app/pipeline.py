@@ -70,7 +70,7 @@ def scan_note(stats: dict) -> str:
             f"couldn't fill · AI filled {stats['filled']}")
 
 
-def run_scan(conn: sqlite3.Connection) -> dict:
+def run_scan(conn: sqlite3.Connection, ai_on_override: bool | None = None) -> dict:
     creators = db.list_creators(conn)
     creators_by_id = {c.id: c for c in creators}
     scanner = SampleFolderScanner()
@@ -78,7 +78,7 @@ def run_scan(conn: sqlite3.Connection) -> dict:
     matching, skipped = filter_by_keywords(all_messages)
 
     ref_date = get_reference_date()
-    ai_on = db.ai_enabled(conn)
+    ai_on = db.ai_enabled(conn) if ai_on_override is None else ai_on_override
     exts, stats = _extract_all(matching, ref_date, ai_on)
 
     db.reset_ingest_tables(conn)

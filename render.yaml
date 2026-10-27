@@ -8,3 +8,5 @@ services:
     envVars:
       - key: OPENROUTER_API_KEY
         sync: false
+      - key: AI_ENABLED_DEFAULT
+        value: "true"

@@ -53,7 +53,9 @@ def _ensure_db() -> None:
             for c in db.load_creators_from_csv():
                 db.save_creator(conn, c)
         if not db.get_setting(conn, "last_scan"):
-            pipeline.run_scan(conn)
+            # Rules only: the host waits on startup before routing traffic, and an AI
+            # scan can take its full time budget.
+            pipeline.run_scan(conn, ai_on_override=False)
 
 
 @app.on_event("startup")

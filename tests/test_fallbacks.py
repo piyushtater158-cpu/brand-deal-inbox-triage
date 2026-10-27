@@ -34,6 +34,44 @@ def test_only_free_models_are_ever_requested(monkeypatch):
     assert ai._models("text") == ["minimax/minimax-m3.1-flash:free"]
 
 
+def test_a_model_specific_403_does_not_pause_ai(monkeypatch):
+    monkeypatch.setitem(ai._pause, "until", 0.0)
+    ai._handle_error(403, '{"message": "this model is only available on agentic harnesses"}')
+    assert ai._pause["until"] == 0.0
+    ai._handle_error(401, '{"message": "User not found."}')
+    assert ai._pause["until"] > 0
+    monkeypatch.setitem(ai._pause, "until", 0.0)
+
+
+@pytest.mark.parametrize("env_value, expected", [(None, False), ("true", True), ("0", False)])
+def test_fresh_database_seeds_ai_toggle_from_env(tmp_path, monkeypatch, env_value, expected):
+    from app import db
+
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "app.db"))
+    if env_value is None:
+        monkeypatch.delenv("AI_ENABLED_DEFAULT", raising=False)
+    else:
+        monkeypatch.setenv("AI_ENABLED_DEFAULT", env_value)
+    with db.get_conn() as conn:
+        db.init_schema(conn)
+        assert db.ai_enabled(conn) is expected
+
+
+def test_boot_scan_is_rules_only_even_with_ai_on(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "app.db"))
+    monkeypatch.setenv("AI_ENABLED_DEFAULT", "true")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(ai.httpx, "post", lambda *a, **k: pytest.fail("boot scan called the API"))
+    from app.main import app
+
+    with TestClient(app) as client:
+        page = client.get("/").text
+        assert "AI ON" in page
+        assert len(client.get("/api/debug").json()["inquiries"]) == 29
+
+
 def test_ai_fills_only_gaps_and_only_with_known_categories():
     """Rules values always win; an AI category outside the config vocabulary is dropped,
     because conflict and no-go checks are exact matches."""

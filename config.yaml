@@ -168,18 +168,17 @@ ai:
   vision_model_env_var: OPENROUTER_VISION_MODEL
   api_key_env_var: OPENROUTER_API_KEY
   text_models:
-  - minimax/minimax-m3.1-flash:free
+  - nvidia/nemotron-3.5-super-vl:free
+  - dots-studio/dots-3-note-preview:free
+  - nvidia/nemotron-3.5-lightning:free
   - xingchen-agi/xing4.0-29b-a4b:free
   - google/gemma-4-31b-it:free
-  - nvidia/nemotron-3.5-super-vl:free
   - google/gemma-4-26b-a4b-it:free
-  - nvidia/nemotron-3-super-120b-a12b:free
   vision_models:
-  - minimax/minimax-m3.1-flash:free
   - nvidia/nemotron-3.5-super-vl:free
+  - dots-studio/dots-3-note-preview:free
   - google/gemma-4-31b-it:free
   - google/gemma-4-26b-a4b-it:free
-  - dots-studio/dots-3-note-preview:free
   timeout_seconds: 30
   vision_timeout_seconds: 45
   scan_time_budget_seconds: 40
